@@ -1,0 +1,302 @@
+import type { Category, CategoryId, Tool, ToolSlug } from "./types";
+
+export const CATEGORIES: readonly Category[] = [
+  {
+    id: "data",
+    label: "Data",
+    description: "Inspect and clean structured data.",
+  },
+  {
+    id: "encoding",
+    label: "Encoding",
+    description: "Encode and decode common text formats.",
+  },
+  {
+    id: "generators",
+    label: "Generators",
+    description: "Create identifiers and schedule expressions.",
+  },
+  {
+    id: "time",
+    label: "Time",
+    description: "Convert timestamps and dates.",
+  },
+  {
+    id: "text",
+    label: "Text & Query",
+    description: "Test patterns and format queries.",
+  },
+] as const;
+
+export const TOOLS: readonly Tool[] = [
+  {
+    slug: "json-formatter",
+    name: "JSON Formatter",
+    title: "JSON Formatter — Format, Minify & Validate JSON",
+    h1: "JSON Formatter",
+    description:
+      "Format, minify, and validate JSON in your browser. Nothing is sent to a server.",
+    category: "data",
+    keywords: [
+      "json",
+      "format",
+      "formatter",
+      "pretty",
+      "pretty-print",
+      "beautify",
+      "minify",
+      "prettify",
+      "indent",
+    ],
+    popular: true,
+    related: ["json-validator", "base64", "jwt-decoder"],
+    capabilities: ["copy", "clear", "paste", "download"],
+  },
+  {
+    slug: "json-validator",
+    name: "JSON Validator",
+    title: "JSON Validator — Check JSON Syntax",
+    h1: "JSON Validator",
+    description:
+      "Validate JSON and see clear error locations. Runs entirely in your browser.",
+    category: "data",
+    keywords: [
+      "json",
+      "validate",
+      "validator",
+      "validation",
+      "syntax",
+      "lint",
+      "check",
+      "parse",
+    ],
+    popular: false,
+    related: ["json-formatter", "jwt-decoder"],
+    capabilities: ["copy", "clear"],
+  },
+  {
+    slug: "jwt-decoder",
+    name: "JWT Decoder",
+    title: "JWT Decoder — Decode JSON Web Tokens",
+    h1: "JWT Decoder",
+    description:
+      "Decode a JWT header and payload in your browser. Decoding does not verify the signature.",
+    category: "data",
+    keywords: [
+      "jwt",
+      "token",
+      "decode",
+      "decoder",
+      "claims",
+      "json web token",
+      "bearer",
+      "header",
+      "payload",
+    ],
+    popular: true,
+    related: ["json-formatter", "base64", "unix-timestamp"],
+    capabilities: ["copy", "clear", "paste"],
+  },
+  {
+    slug: "base64",
+    name: "Base64 Encoder / Decoder",
+    title: "Base64 Encoder & Decoder",
+    h1: "Base64 Encoder / Decoder",
+    description:
+      "Encode and decode Base64, including Unicode text, locally in your browser.",
+    category: "encoding",
+    keywords: [
+      "base64",
+      "encode",
+      "encoder",
+      "decode",
+      "decoder",
+      "encoding",
+      "unicode",
+    ],
+    popular: true,
+    related: ["url-encoder", "jwt-decoder"],
+    capabilities: ["copy", "clear", "swap"],
+  },
+  {
+    slug: "url-encoder",
+    name: "URL Encoder / Decoder",
+    title: "URL Encoder & Decoder",
+    h1: "URL Encoder / Decoder",
+    description:
+      "Encode and decode URL components, including Unicode, in your browser.",
+    category: "encoding",
+    keywords: [
+      "url",
+      "uri",
+      "encode",
+      "encoder",
+      "decode",
+      "decoder",
+      "percent-encoding",
+      "query string",
+      "unicode",
+    ],
+    popular: false,
+    related: ["base64", "json-formatter"],
+    capabilities: ["copy", "clear", "swap"],
+  },
+  {
+    slug: "uuid-generator",
+    name: "UUID Generator",
+    title: "UUID Generator — Create UUID v4",
+    h1: "UUID Generator",
+    description: "Generate UUID v4 identifiers locally with the Web Crypto API.",
+    category: "generators",
+    keywords: [
+      "uuid",
+      "guid",
+      "v4",
+      "generate",
+      "generator",
+      "identifier",
+      "unique id",
+    ],
+    popular: true,
+    related: ["unix-timestamp", "base64"],
+    capabilities: ["copy", "clear"],
+  },
+  {
+    slug: "unix-timestamp",
+    name: "Unix Timestamp Converter",
+    title: "Unix Timestamp Converter",
+    h1: "Unix Timestamp Converter",
+    description:
+      "Convert between Unix timestamps and dates. Seconds or milliseconds, local time or UTC.",
+    category: "time",
+    keywords: [
+      "unix",
+      "timestamp",
+      "epoch",
+      "date",
+      "time",
+      "milliseconds",
+      "utc",
+      "converter",
+    ],
+    popular: false,
+    related: ["jwt-decoder", "cron-generator"],
+    capabilities: ["copy", "clear"],
+  },
+  {
+    slug: "regex-tester",
+    name: "Regex Tester",
+    title: "Regex Tester — Test Regular Expressions",
+    h1: "Regex Tester",
+    description:
+      "Test regular expressions against sample text in your browser. Invalid patterns cannot crash the page.",
+    category: "text",
+    keywords: [
+      "regex",
+      "regexp",
+      "regular expression",
+      "match",
+      "pattern",
+      "test",
+      "tester",
+      "flags",
+    ],
+    popular: true,
+    related: ["json-formatter", "url-encoder"],
+    capabilities: ["copy", "clear"],
+  },
+  {
+    slug: "sql-formatter",
+    name: "SQL Formatter",
+    title: "SQL Formatter",
+    h1: "SQL Formatter",
+    description:
+      "Format SQL in your browser. Supported dialects are listed on the page; this is not a universal SQL parser.",
+    category: "text",
+    keywords: [
+      "sql",
+      "format",
+      "formatter",
+      "query",
+      "pretty",
+      "beautify",
+      "dialect",
+    ],
+    popular: false,
+    related: ["json-formatter", "regex-tester"],
+    capabilities: ["copy", "clear", "paste", "download"],
+  },
+  {
+    slug: "cron-generator",
+    name: "Cron Expression Generator",
+    title: "Cron Expression Generator",
+    h1: "Cron Expression Generator",
+    description:
+      "Build a cron expression from minute, hour, day, month, and weekday, with a plain-language explanation.",
+    category: "generators",
+    keywords: ["cron", "schedule", "crontab", "expression", "job", "generator"],
+    popular: false,
+    related: ["unix-timestamp", "regex-tester"],
+    capabilities: ["copy", "clear"],
+  },
+] as const;
+
+const toolsBySlug = new Map<ToolSlug, Tool>(
+  TOOLS.map((tool) => [tool.slug, tool]),
+);
+
+const categoriesById = new Map<CategoryId, Category>(
+  CATEGORIES.map((category) => [category.id, category]),
+);
+
+export function getToolBySlug(slug: string): Tool | undefined {
+  return toolsBySlug.get(slug as ToolSlug);
+}
+
+export function getAllTools(): readonly Tool[] {
+  return TOOLS;
+}
+
+export function getPopularTools(): Tool[] {
+  return TOOLS.filter((tool) => tool.popular);
+}
+
+export function getCategory(id: CategoryId): Category | undefined {
+  return categoriesById.get(id);
+}
+
+export function getToolsByCategory(id: CategoryId): Tool[] {
+  return TOOLS.filter((tool) => tool.category === id);
+}
+
+export function getRelatedTools(tool: Tool): Tool[] {
+  return tool.related
+    .map((slug) => toolsBySlug.get(slug))
+    .filter((related): related is Tool => related !== undefined);
+}
+
+export function searchTools(
+  query: string,
+  tools: readonly Tool[] = TOOLS,
+): Tool[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return [...tools];
+  }
+
+  return tools.filter((tool) => {
+    const category = getCategory(tool.category);
+    const haystack = [
+      tool.name,
+      tool.h1,
+      tool.description,
+      tool.category,
+      category?.label ?? "",
+      ...tool.keywords,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalized);
+  });
+}

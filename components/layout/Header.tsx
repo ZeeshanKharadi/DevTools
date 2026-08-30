@@ -1,0 +1,41 @@
+import Link from "next/link";
+import { SITE_NAME } from "@/lib/site";
+import { Container } from "./Container";
+import { ThemeToggle } from "./ThemeToggle";
+
+const nav = [
+  { href: "/", label: "Home" },
+  { href: "/tools", label: "Tools" },
+];
+
+export function Header() {
+  return (
+    <header className="border-b border-line bg-panel/90 backdrop-blur-sm">
+      <Container className="flex h-16 items-center justify-between gap-4">
+        <div className="flex items-center gap-8">
+          <Link
+            href="/"
+            className="text-sm font-semibold tracking-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+          >
+            {SITE_NAME}
+          </Link>
+          <nav aria-label="Primary">
+            <ul className="flex items-center gap-4 text-sm">
+              {nav.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+        <ThemeToggle />
+      </Container>
+    </header>
+  );
+}
