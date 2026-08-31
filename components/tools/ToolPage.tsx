@@ -7,6 +7,7 @@ import { Examples } from "./Examples";
 import { HowToUse } from "./HowToUse";
 import { PrivacyNotice } from "./PrivacyNotice";
 import { RelatedTools } from "./RelatedTools";
+import { RevealWorkspace } from "./RevealWorkspace";
 import { ToolFAQ } from "./ToolFAQ";
 import { ToolIsland } from "./ToolIsland";
 
@@ -35,7 +36,7 @@ export function ToolPage({ tool, content }: ToolPageProps) {
           />
         </div>
 
-        <header className="pt-20 sm:pt-24">
+        <header className="pt-6 sm:pt-8">
           <p className="text-xs font-medium uppercase tracking-wide text-muted">
             {category?.label ?? tool.category}
           </p>
@@ -48,7 +49,8 @@ export function ToolPage({ tool, content }: ToolPageProps) {
           </div>
         </header>
 
-        <div className="mt-5">
+        <div id="workspace" className="mt-5 scroll-mt-20">
+          <RevealWorkspace />
           <ToolIsland tool={tool} />
         </div>
 
