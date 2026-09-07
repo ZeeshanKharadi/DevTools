@@ -18,4 +18,9 @@ export type ToolContent = {
   examples: ToolExample[];
   faq: FaqItem[];
   privacy?: string;
+  intro?: string;
+  bestPractices?: ToolExample[];
+  bestPracticesHeading?: string;
+  install?: HowToStep[];
+  installHeading?: string;
 };

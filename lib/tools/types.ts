@@ -1,4 +1,10 @@
-export type CategoryId = "data" | "encoding" | "generators" | "time" | "text";
+export type CategoryId =
+  | "data"
+  | "encoding"
+  | "generators"
+  | "time"
+  | "text"
+  | "business";
 
 export type ToolCapability = "copy" | "clear" | "paste" | "download" | "swap";
 
@@ -12,7 +18,11 @@ export type ToolSlug =
   | "unix-timestamp"
   | "regex-tester"
   | "sql-formatter"
-  | "cron-generator";
+  | "cron-generator"
+  | "email-signature-generator"
+  | "qr-code-generator"
+  | "invoice-generator"
+  | "digital-business-card";
 
 export type Tool = {
   slug: ToolSlug;

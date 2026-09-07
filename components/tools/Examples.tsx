@@ -2,13 +2,23 @@ import type { ToolExample } from "@/content/tools/types";
 
 type ExamplesProps = {
   examples: readonly ToolExample[];
+  heading?: string;
+  headingId?: string;
 };
 
-export function Examples({ examples }: ExamplesProps) {
+export function Examples({
+  examples,
+  heading = "Examples",
+  headingId = "examples-heading",
+}: ExamplesProps) {
+  if (examples.length === 0) {
+    return null;
+  }
+
   return (
-    <section aria-labelledby="examples-heading" className="space-y-4">
-      <h2 id="examples-heading" className="text-xl font-semibold tracking-tight">
-        Examples
+    <section aria-labelledby={headingId} className="space-y-4">
+      <h2 id={headingId} className="text-xl font-semibold tracking-tight">
+        {heading}
       </h2>
       <ul className="space-y-4">
         {examples.map((example) => (

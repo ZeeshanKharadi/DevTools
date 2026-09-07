@@ -1,6 +1,10 @@
 import type { ToolSlug } from "@/lib/tools/types";
 import { base64Content } from "./base64";
 import { cronGeneratorContent } from "./cron-generator";
+import { digitalBusinessCardContent } from "./digital-business-card";
+import { emailSignatureGeneratorContent } from "./email-signature-generator";
+import { invoiceGeneratorContent } from "./invoice-generator";
+import { qrCodeGeneratorContent } from "./qr-code-generator";
 import { jsonFormatterContent } from "./json-formatter";
 import { jsonValidatorContent } from "./json-validator";
 import { jwtDecoderContent } from "./jwt-decoder";
@@ -22,6 +26,10 @@ const contentBySlug: Record<ToolSlug, ToolContent> = {
   "cron-generator": cronGeneratorContent,
   "regex-tester": regexTesterContent,
   "sql-formatter": sqlFormatterContent,
+  "email-signature-generator": emailSignatureGeneratorContent,
+  "qr-code-generator": qrCodeGeneratorContent,
+  "invoice-generator": invoiceGeneratorContent,
+  "digital-business-card": digitalBusinessCardContent,
 };
 
 export function getToolContent(slug: ToolSlug): ToolContent {

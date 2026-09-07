@@ -1,4 +1,4 @@
-export const SITE_NAME = "DevTools";
+export const SITE_NAME = "InfyraTools";
 
 export function getSiteUrl(): string {
   const url = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

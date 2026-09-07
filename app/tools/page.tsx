@@ -23,7 +23,7 @@ export default function ToolsPage() {
       <header className="max-w-2xl space-y-3">
         <h1 className="text-3xl font-semibold tracking-tight">Developer tools</h1>
         <p className="text-base text-muted">
-          Every V1 tool runs in your browser. Open a category or jump straight
+          Every tool runs in your browser. Open a category or jump straight
           to a workspace.
         </p>
       </header>

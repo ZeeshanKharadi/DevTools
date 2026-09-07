@@ -24,7 +24,7 @@ export function PlatformIntro() {
         How this site works
       </h2>
       <p className="max-w-2xl text-sm text-muted">
-        DevTools is a small set of utilities for everyday development work.
+        InfyraTools is a small set of utilities for everyday development work.
         Processing stays on your device whenever the tool can run locally.
       </p>
       <ul className="grid gap-4 sm:grid-cols-2">

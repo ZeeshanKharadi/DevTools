@@ -29,6 +29,19 @@ const RegexTesterTool = dynamic(
 const SqlFormatterTool = dynamic(
   () => import("@/components/sql-formatter/SqlFormatterTool"),
 );
+const EmailSignatureTool = dynamic(
+  () =>
+    import("@/components/email-signature-generator/EmailSignatureTool"),
+);
+const QrCodeTool = dynamic(
+  () => import("@/components/qr-code-generator/QrCodeTool"),
+);
+const InvoiceTool = dynamic(
+  () => import("@/components/invoice-generator/InvoiceTool"),
+);
+const DigitalBusinessCardTool = dynamic(
+  () => import("@/components/digital-business-card/DigitalBusinessCardTool"),
+);
 
 type ToolIslandProps = {
   tool: Tool;
@@ -56,6 +69,14 @@ export function ToolIsland({ tool }: ToolIslandProps) {
       return <RegexTesterTool />;
     case "sql-formatter":
       return <SqlFormatterTool />;
+    case "email-signature-generator":
+      return <EmailSignatureTool />;
+    case "qr-code-generator":
+      return <QrCodeTool />;
+    case "invoice-generator":
+      return <InvoiceTool />;
+    case "digital-business-card":
+      return <DigitalBusinessCardTool />;
     default: {
       const exhaustive: never = tool.slug;
       throw new Error(`No workspace for ${exhaustive}`);

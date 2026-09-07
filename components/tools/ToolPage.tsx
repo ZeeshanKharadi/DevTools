@@ -44,6 +44,9 @@ export function ToolPage({ tool, content }: ToolPageProps) {
             {tool.h1}
           </h1>
           <p className="mt-2 text-base text-muted">{tool.description}</p>
+          {content.intro ? (
+            <p className="max-w-3xl text-sm leading-6 text-muted">{content.intro}</p>
+          ) : null}
           <div className="mt-4">
             <PrivacyNotice>{privacy}</PrivacyNotice>
           </div>
@@ -56,7 +59,26 @@ export function ToolPage({ tool, content }: ToolPageProps) {
 
         <div className="mt-16 space-y-10">
           <HowToUse steps={content.howTo} />
+          {content.install ? (
+            <HowToUse
+              steps={content.install}
+              heading={
+                content.installHeading ??
+                "Install in Gmail, Outlook, and Apple Mail"
+              }
+              headingId="install-heading"
+            />
+          ) : null}
           <Examples examples={content.examples} />
+          {content.bestPractices ? (
+            <Examples
+              examples={content.bestPractices}
+              heading={
+                content.bestPracticesHeading ?? "Email signature best practices"
+              }
+              headingId="best-practices-heading"
+            />
+          ) : null}
           <ToolFAQ faq={content.faq} />
           <RelatedTools tools={related} />
         </div>
