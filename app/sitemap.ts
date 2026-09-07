@@ -1,11 +1,15 @@
 import type { MetadataRoute } from "next";
-import { absoluteUrl } from "@/lib/site";
+import { LEGAL_PAGES, absoluteUrl } from "@/lib/site";
 import { getAllTools } from "@/lib/tools/registry";
 
 export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const staticRoutes = ["/", "/tools"].map((path) => ({
+  const staticRoutes = [
+    "/",
+    "/tools",
+    ...LEGAL_PAGES.map((page) => page.path),
+  ].map((path) => ({
     url: absoluteUrl(path),
     lastModified: new Date(),
   }));

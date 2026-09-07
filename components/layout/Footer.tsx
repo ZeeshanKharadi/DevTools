@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { ParentBrandLine } from "@/components/legal/ParentBrandLine";
+import { LEGAL_PAGES, SITE_NAME } from "@/lib/site";
 import { getAllTools } from "@/lib/tools/registry";
-import { SITE_NAME } from "@/lib/site";
 import { Container } from "./Container";
 
 export function Footer() {
@@ -15,6 +16,7 @@ export function Footer() {
             Free developer tools that run in your browser. Your input is not
             uploaded.
           </p>
+          <ParentBrandLine className="max-w-sm" />
         </div>
         <nav aria-label="Footer">
           <p className="mb-3 text-sm font-semibold text-foreground">Site</p>
@@ -35,6 +37,16 @@ export function Footer() {
                 All tools
               </Link>
             </li>
+            {LEGAL_PAGES.map((page) => (
+              <li key={page.path}>
+                <Link
+                  href={page.path}
+                  className="text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+                >
+                  {page.name}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
         <nav aria-label="Tools">
