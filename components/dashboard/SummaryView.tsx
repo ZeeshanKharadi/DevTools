@@ -95,7 +95,7 @@ export function SummaryView() {
         ) : null}
         <Feedback>
           Free tools still work without an account. This dashboard only adds
-          persistence and hosted/dynamic features. Billing is not enabled yet.
+          persistence and hosted/dynamic features.
         </Feedback>
       </DashboardShell>
     </RequireAuth>

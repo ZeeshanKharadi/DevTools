@@ -59,12 +59,16 @@ export function DashboardShell({
     <div className="space-y-8">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">
-          InfyraTools
+          InfyraTools Pro Beta
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-2 text-sm text-muted">
           {description}
           {user ? ` Signed in as ${user.email}.` : ""}
+        </p>
+        <p className="mt-3 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
+          InfyraTools Pro Beta — Complimentary access to all Pro features during
+          beta. No payment method required.
         </p>
       </div>
       <nav aria-label="Account">

@@ -93,7 +93,7 @@ Until R2 exists, do not make hosted images mandatory.
 
 Later, when deploying:
 
-1. Workers **Paid** (PBKDF2 600,000 iterations will not fit Workers Free 10 ms CPU)
+1. Workers **Paid** (PBKDF2 100,000 iterations; Cloudflare production rejects higher counts, and Workers Free is 10 ms CPU)
 2. Production D1 + apply migrations `0001` and `0002`
 3. Worker routes: `infyratools.com/api/*`, `/card/*`, `/q/*`
 4. `APP_ORIGIN=https://infyratools.com`

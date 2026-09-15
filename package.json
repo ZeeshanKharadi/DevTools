@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "worker:dev": "wrangler dev --config worker/wrangler.toml",
-    "d1:create": "wrangler d1 create infyratools --config worker/wrangler.toml",
-    "d1:migrate:local": "wrangler d1 migrations apply infyratools --local --config worker/wrangler.toml",
-    "d1:migrate:remote": "wrangler d1 migrations apply infyratools --remote --config worker/wrangler.toml",
+    "d1:create": "wrangler d1 create infyratools-production --config worker/wrangler.toml",
+    "d1:migrate:local": "wrangler d1 migrations apply infyratools-production --local --config worker/wrangler.toml",
+    "d1:migrate:remote": "wrangler d1 migrations apply infyratools-production --remote --config worker/wrangler.toml",
     "worker:deploy": "wrangler deploy --config worker/wrangler.toml"
   },
   "dependencies": {

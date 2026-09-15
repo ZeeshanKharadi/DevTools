@@ -66,7 +66,7 @@ No production secrets are required for sessions: the cookie holds an opaque rand
 ## Authentication and sessions
 
 - Register / login / logout / `GET /api/auth/me`
-- Passwords hashed with **Web Crypto PBKDF2-HMAC-SHA256** (600,000 iterations, unique random salt). The stored string is `pbkdf2-hmac-sha256$1$<iterations>$<salt>$<hash>`. Verification uses the work factor stored with that hash. Hashes are never returned in API responses. Local Wrangler hashing/verification is about **1.7–2.1 seconds**, within the Workers Paid default 30-second CPU limit. This will not fit in Workers Free (10 ms CPU).
+- Passwords hashed with **Web Crypto PBKDF2-HMAC-SHA256** (100,000 iterations, unique random salt). Cloudflare production Web Crypto and `node:crypto` reject PBKDF2 above 100,000 iterations (`NotSupportedError`). The stored string is `pbkdf2-hmac-sha256$1$<iterations>$<salt>$<hash>`. Verification uses the work factor stored with that hash. Hashes are never returned in API responses. This still requires Workers Paid (Free is 10 ms CPU).
 - Session cookie `infyratools_session`: **HttpOnly**, **SameSite=Lax** (production), **Secure** in production, 14-day expiry.
 - Session lookups require `expires_at > now` in the database query. The service layer also rejects expired sessions on every authenticated request. Expired rows for that identifier may be deleted when encountered. There is no scheduled session cleanup in this phase.
 - Current user is taken from the session, never from a client-supplied `user_id`.

@@ -1,6 +1,6 @@
 const HASH_ALGORITHM = "pbkdf2-hmac-sha256";
 const HASH_VERSION = 1;
-export const PBKDF2_ITERATIONS = 600_000;
+export const PBKDF2_ITERATIONS = 100_000;
 const MAX_VERIFY_ITERATIONS = 5_000_000;
 const SALT_BYTES = 16;
 const KEY_BITS = 256;

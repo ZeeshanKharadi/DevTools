@@ -19,6 +19,7 @@ describe("password hashing", () => {
     expect(parts[0]).toBe("pbkdf2-hmac-sha256");
     expect(parts[1]).toBe("1");
     expect(parts[2]).toBe(String(PBKDF2_ITERATIONS));
+    expect(parts[2]).toBe("100000");
     expect(first).not.toContain(password);
   });
 

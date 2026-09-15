@@ -2,25 +2,35 @@ name = "infyratools-api"
 main = "src/index.ts"
 compatibility_date = "2026-09-07"
 
+[limits]
+cpu_ms = 30000
+
+[observability]
+enabled = true
+
 [vars]
-APP_ORIGIN = "http://localhost:3000"
-PUBLIC_BASE_URL = "http://localhost:8787"
-COOKIE_SECURE = "false"
+APP_ORIGIN = "https://infyratools.com"
+PUBLIC_BASE_URL = "https://infyratools.com"
+COOKIE_SECURE = "true"
 COOKIE_SAMESITE = "lax"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "infyratools"
-database_id = "replace-with-cloudflare-d1-id"
+database_name = "infyratools-production"
+database_id = "437133b7-2869-4371-bb1b-0c3c873ecf92"
 migrations_dir = "migrations"
 
-# Production (set in the Cloudflare dashboard or wrangler secret/vars):
-# APP_ORIGIN = "https://infyratools.com"
-# PUBLIC_BASE_URL = "https://infyratools.com"
-# COOKIE_SECURE = "true"
-# COOKIE_SAMESITE = "lax"
-#
-# Route the Worker to the same hostname as the static site:
-# infyratools.com/api/*
-# infyratools.com/card/*
-# infyratools.com/q/*
+[[routes]]
+pattern = "infyratools.com/api/*"
+zone_name = "infyratools.com"
+
+[[routes]]
+pattern = "infyratools.com/card/*"
+zone_name = "infyratools.com"
+
+[[routes]]
+pattern = "infyratools.com/q/*"
+zone_name = "infyratools.com"
+
+# Local `wrangler dev` overrides vars via worker/.dev.vars (not committed).
+# Local D1 still uses --local and does not touch this remote database.
