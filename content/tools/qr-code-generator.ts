@@ -42,7 +42,7 @@ export const qrCodeGeneratorContent: ToolContent = {
     {
       question: "Can I change the destination after I generate the code?",
       answer:
-        "No. These are static QR codes. The URL, Wi-Fi details, or vCard are encoded in the image. Changing them later requires generating and sharing a new code. Editable destinations and scan analytics would need a server and are not included here.",
+        "Not in this free static generator. The URL, Wi-Fi details, or vCard are encoded in the image. Signed-in users can create a separate Dynamic QR whose image points at infyratools.com/q/<code> so the destination can change later.",
     },
     {
       question: "Does a WiFi QR Code Generator send my password to a server?",
@@ -62,7 +62,7 @@ export const qrCodeGeneratorContent: ToolContent = {
     {
       question: "Do you store my QR codes?",
       answer:
-        "No. Nothing is saved on a server. Saved QR codes, custom domains, bulk generation, and hosted short URLs are possible later as separate Pro features without changing this static generator.",
+        "This static generator does not save codes. Dynamic QR codes with short URLs and scan counts are a separate signed-in product and do not replace this tool.",
     },
   ],
 };

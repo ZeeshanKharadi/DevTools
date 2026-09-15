@@ -1,6 +1,8 @@
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_FOREGROUND,
+  DEFAULT_STYLE,
+  EMPTY_FIELDS,
   LOGO_SIZE_RATIO,
 } from "./constants";
 import { buildQrPayload, colorWarnings } from "./payload";
@@ -223,4 +225,16 @@ export async function renderStaticQr(input: QrInput): Promise<QrRenderResult> {
       message: `${message} Try shorter content or a higher error-correction level.`,
     };
   }
+}
+
+export async function renderQrText(
+  text: string,
+  style: QrStyle = DEFAULT_STYLE,
+): Promise<QrRenderResult> {
+  return renderStaticQr({
+    type: "text",
+    fields: { ...EMPTY_FIELDS, text },
+    style,
+    logoDataUrl: null,
+  });
 }

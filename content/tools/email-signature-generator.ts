@@ -2,7 +2,7 @@ import type { ToolContent } from "./types";
 
 export const emailSignatureGeneratorContent: ToolContent = {
   privacy:
-    "Processed locally — your signature details never leave your browser.",
+    "Preview, copy, and download stay in your browser. Signing in to save is optional and stores structured signature details in your InfyraTools account — not generated HTML.",
   intro:
     "This free HTML email signature generator builds a professional signature you can paste into Gmail, Outlook, or Apple Mail. Choose a template, add only the fields you need, and copy rich HTML. Empty fields are left out of the markup.",
   howTo: [
@@ -61,7 +61,7 @@ export const emailSignatureGeneratorContent: ToolContent = {
     {
       question: "Is this a free email signature generator?",
       answer:
-        "Yes. You can build and copy a professional HTML email signature in the browser. There is no account and no upload of your details.",
+        "Yes. You can build and copy a professional HTML email signature in the browser without an account. Signing in is optional and only needed if you want to save signatures to reopen later.",
     },
     {
       question: "Does this work as a Gmail signature generator and Outlook signature generator?",

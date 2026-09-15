@@ -1,0 +1,805 @@
+import type {
+  BusinessProfileRepository,
+  CardRepository,
+  CustomerRepository,
+  InvoiceRepository,
+  QrCodeRepository,
+  RateLimitStore,
+  Repositories,
+  SessionRepository,
+  SignatureRepository,
+  UserRepository,
+} from "./repositories";
+import type {
+  BusinessCardRecord,
+  BusinessProfileRecord,
+  CustomerRecord,
+  DynamicQrRecord,
+  InvoiceRecord,
+  SessionRecord,
+  SignatureRecord,
+  UserRecord,
+} from "./types";
+
+type D1DatabaseLike = {
+  prepare(query: string): {
+    bind(...values: unknown[]): {
+      first<T = Record<string, unknown>>(): Promise<T | null>;
+      run(): Promise<unknown>;
+      all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
+    };
+  };
+};
+
+type UserRow = {
+  id: string;
+  email: string;
+  password_hash: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type SessionRow = {
+  id: string;
+  user_id: string;
+  expires_at: string;
+  created_at: string;
+  last_used_at: string;
+};
+
+type SignatureRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  signature_data: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type CardRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  public_slug: string;
+  is_active: number;
+  card_data: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type QrRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  code: string;
+  destination_url: string;
+  is_active: number;
+  total_scans: number;
+  last_scanned_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CustomerRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  address: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type InvoiceRow = {
+  id: string;
+  user_id: string;
+  invoice_number: string;
+  status: string;
+  currency: string;
+  invoice_data: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ProfileRow = {
+  user_id: string;
+  business_name: string;
+  name: string;
+  email: string;
+  phone: string;
+  website: string;
+  address: string;
+  logo_url: string;
+  updated_at: string;
+};
+
+function mapUser(row: UserRow): UserRecord {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapSession(row: SessionRow): SessionRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+  };
+}
+
+function mapSignature(row: SignatureRow): SignatureRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    signatureData: row.signature_data,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCard(row: CardRow): BusinessCardRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    publicSlug: row.public_slug,
+    isActive: row.is_active === 1,
+    cardData: row.card_data,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapQr(row: QrRow): DynamicQrRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    code: row.code,
+    destinationUrl: row.destination_url,
+    isActive: row.is_active === 1,
+    totalScans: Number(row.total_scans ?? 0),
+    lastScannedAt: row.last_scanned_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCustomer(row: CustomerRow): CustomerRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    company: row.company,
+    address: row.address,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapInvoice(row: InvoiceRow): InvoiceRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    invoiceNumber: row.invoice_number,
+    status: row.status,
+    currency: row.currency,
+    invoiceData: row.invoice_data,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapProfile(row: ProfileRow): BusinessProfileRecord {
+  return {
+    userId: row.user_id,
+    businessName: row.business_name,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    website: row.website,
+    address: row.address,
+    logoUrl: row.logo_url,
+    updatedAt: row.updated_at,
+  };
+}
+
+function likeContains(query?: string): string | null {
+  const needle = query?.trim();
+  if (!needle) {
+    return null;
+  }
+  return `%${needle.replace(/[%_]/g, "")}%`;
+}
+
+export function createD1Repositories(db: D1DatabaseLike): Repositories {
+  const users: UserRepository = {
+    async findByEmail(email) {
+      const row = await db
+        .prepare(
+          "SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = ? LIMIT 1",
+        )
+        .bind(email)
+        .first<UserRow>();
+      return row ? mapUser(row) : null;
+    },
+    async findById(id) {
+      const row = await db
+        .prepare(
+          "SELECT id, email, password_hash, created_at, updated_at FROM users WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<UserRow>();
+      return row ? mapUser(row) : null;
+    },
+    async create(user) {
+      try {
+        await db
+          .prepare(
+            "INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+          )
+          .bind(
+            user.id,
+            user.email,
+            user.passwordHash,
+            user.createdAt,
+            user.updatedAt,
+          )
+          .run();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("UNIQUE") || message.includes("unique")) {
+          throw new Error("UNIQUE_EMAIL");
+        }
+        throw error;
+      }
+    },
+  };
+
+  const sessions: SessionRepository = {
+    async create(session) {
+      await db
+        .prepare(
+          "INSERT INTO sessions (id, user_id, expires_at, created_at, last_used_at) VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(
+          session.id,
+          session.userId,
+          session.expiresAt,
+          session.createdAt,
+          session.lastUsedAt,
+        )
+        .run();
+    },
+    async findById(id, nowIso) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, expires_at, created_at, last_used_at FROM sessions WHERE id = ? AND expires_at > ? LIMIT 1",
+        )
+        .bind(id, nowIso)
+        .first<SessionRow>();
+      return row ? mapSession(row) : null;
+    },
+    async delete(id) {
+      await db.prepare("DELETE FROM sessions WHERE id = ?").bind(id).run();
+    },
+    async deleteIfExpired(id, nowIso) {
+      await db
+        .prepare("DELETE FROM sessions WHERE id = ? AND expires_at <= ?")
+        .bind(id, nowIso)
+        .run();
+    },
+    async deleteExpired(nowIso) {
+      await db
+        .prepare("DELETE FROM sessions WHERE expires_at <= ?")
+        .bind(nowIso)
+        .run();
+    },
+    async touch(id, lastUsedAt) {
+      await db
+        .prepare("UPDATE sessions SET last_used_at = ? WHERE id = ?")
+        .bind(lastUsedAt, id)
+        .run();
+    },
+  };
+
+  const signatures: SignatureRepository = {
+    async listByUser(userId) {
+      const result = await db
+        .prepare(
+          "SELECT id, user_id, name, signature_data, created_at, updated_at FROM email_signatures WHERE user_id = ? ORDER BY updated_at DESC",
+        )
+        .bind(userId)
+        .all<SignatureRow>();
+      return result.results.map(mapSignature);
+    },
+    async findById(id) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, name, signature_data, created_at, updated_at FROM email_signatures WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<SignatureRow>();
+      return row ? mapSignature(row) : null;
+    },
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO email_signatures (id, name, user_id, signature_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.name,
+          record.userId,
+          record.signatureData,
+          record.createdAt,
+          record.updatedAt,
+        )
+        .run();
+    },
+    async update(record) {
+      await db
+        .prepare(
+          "UPDATE email_signatures SET name = ?, signature_data = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+        .bind(
+          record.name,
+          record.signatureData,
+          record.updatedAt,
+          record.id,
+          record.userId,
+        )
+        .run();
+    },
+    async delete(id, userId) {
+      const existing = await db
+        .prepare("SELECT id FROM email_signatures WHERE id = ? AND user_id = ? LIMIT 1")
+        .bind(id, userId)
+        .first<{ id: string }>();
+      if (!existing) {
+        return false;
+      }
+      await db
+        .prepare("DELETE FROM email_signatures WHERE id = ? AND user_id = ?")
+        .bind(id, userId)
+        .run();
+      return true;
+    },
+    async countByUser(userId) {
+      const row = await db
+        .prepare("SELECT COUNT(*) AS count FROM email_signatures WHERE user_id = ?")
+        .bind(userId)
+        .first<{ count: number }>();
+      return Number(row?.count ?? 0);
+    },
+  };
+
+  const cards: CardRepository = {
+    async listByUser(userId) {
+      const result = await db
+        .prepare(
+          "SELECT id, user_id, name, public_slug, is_active, card_data, created_at, updated_at FROM business_cards WHERE user_id = ? ORDER BY updated_at DESC",
+        )
+        .bind(userId)
+        .all<CardRow>();
+      return result.results.map(mapCard);
+    },
+    async findById(id) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, name, public_slug, is_active, card_data, created_at, updated_at FROM business_cards WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<CardRow>();
+      return row ? mapCard(row) : null;
+    },
+    async findBySlug(slug) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, name, public_slug, is_active, card_data, created_at, updated_at FROM business_cards WHERE public_slug = ? LIMIT 1",
+        )
+        .bind(slug)
+        .first<CardRow>();
+      return row ? mapCard(row) : null;
+    },
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO business_cards (id, user_id, name, public_slug, is_active, card_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.name,
+          record.publicSlug,
+          record.isActive ? 1 : 0,
+          record.cardData,
+          record.createdAt,
+          record.updatedAt,
+        )
+        .run();
+    },
+    async update(record) {
+      await db
+        .prepare(
+          "UPDATE business_cards SET name = ?, public_slug = ?, is_active = ?, card_data = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+        .bind(
+          record.name,
+          record.publicSlug,
+          record.isActive ? 1 : 0,
+          record.cardData,
+          record.updatedAt,
+          record.id,
+          record.userId,
+        )
+        .run();
+    },
+    async delete(id, userId) {
+      const existing = await db
+        .prepare("SELECT id FROM business_cards WHERE id = ? AND user_id = ? LIMIT 1")
+        .bind(id, userId)
+        .first<{ id: string }>();
+      if (!existing) {
+        return false;
+      }
+      await db
+        .prepare("DELETE FROM business_cards WHERE id = ? AND user_id = ?")
+        .bind(id, userId)
+        .run();
+      return true;
+    },
+    async countByUser(userId) {
+      const row = await db
+        .prepare("SELECT COUNT(*) AS count FROM business_cards WHERE user_id = ?")
+        .bind(userId)
+        .first<{ count: number }>();
+      return Number(row?.count ?? 0);
+    },
+  };
+
+  const qrCodes: QrCodeRepository = {
+    async listByUser(userId) {
+      const result = await db
+        .prepare(
+          "SELECT id, user_id, name, code, destination_url, is_active, total_scans, last_scanned_at, created_at, updated_at FROM dynamic_qr_codes WHERE user_id = ? ORDER BY updated_at DESC",
+        )
+        .bind(userId)
+        .all<QrRow>();
+      return result.results.map(mapQr);
+    },
+    async findById(id) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, name, code, destination_url, is_active, total_scans, last_scanned_at, created_at, updated_at FROM dynamic_qr_codes WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<QrRow>();
+      return row ? mapQr(row) : null;
+    },
+    async findByCode(code) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, name, code, destination_url, is_active, total_scans, last_scanned_at, created_at, updated_at FROM dynamic_qr_codes WHERE code = ? LIMIT 1",
+        )
+        .bind(code)
+        .first<QrRow>();
+      return row ? mapQr(row) : null;
+    },
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO dynamic_qr_codes (id, user_id, name, code, destination_url, is_active, total_scans, last_scanned_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.name,
+          record.code,
+          record.destinationUrl,
+          record.isActive ? 1 : 0,
+          record.totalScans,
+          record.lastScannedAt,
+          record.createdAt,
+          record.updatedAt,
+        )
+        .run();
+    },
+    async update(record) {
+      await db
+        .prepare(
+          "UPDATE dynamic_qr_codes SET name = ?, destination_url = ?, is_active = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+        .bind(
+          record.name,
+          record.destinationUrl,
+          record.isActive ? 1 : 0,
+          record.updatedAt,
+          record.id,
+          record.userId,
+        )
+        .run();
+    },
+    async delete(id, userId) {
+      const existing = await db
+        .prepare("SELECT id FROM dynamic_qr_codes WHERE id = ? AND user_id = ? LIMIT 1")
+        .bind(id, userId)
+        .first<{ id: string }>();
+      if (!existing) {
+        return false;
+      }
+      await db
+        .prepare("DELETE FROM dynamic_qr_codes WHERE id = ? AND user_id = ?")
+        .bind(id, userId)
+        .run();
+      return true;
+    },
+    async countActiveByUser(userId) {
+      const row = await db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM dynamic_qr_codes WHERE user_id = ? AND is_active = 1",
+        )
+        .bind(userId)
+        .first<{ count: number }>();
+      return Number(row?.count ?? 0);
+    },
+    async recordScan(id, scannedAt, eventId) {
+      // total_scans is the dashboard source of truth (atomic increment).
+      await db
+        .prepare(
+          "UPDATE dynamic_qr_codes SET total_scans = total_scans + 1, last_scanned_at = ? WHERE id = ?",
+        )
+        .bind(scannedAt, id)
+        .run();
+      try {
+        await db
+          .prepare(
+            "INSERT INTO qr_scan_events (id, qr_code_id, scanned_at) VALUES (?, ?, ?)",
+          )
+          .bind(eventId, id, scannedAt)
+          .run();
+      } catch {
+        // Event rows are optional analytics and may lag behind total_scans.
+      }
+    },
+  };
+
+  const customers: CustomerRepository = {
+    async listByUser(userId) {
+      const result = await db
+        .prepare(
+          "SELECT id, user_id, name, email, phone, company, address, created_at, updated_at FROM customers WHERE user_id = ? ORDER BY updated_at DESC",
+        )
+        .bind(userId)
+        .all<CustomerRow>();
+      return result.results.map(mapCustomer);
+    },
+    async findById(id) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, name, email, phone, company, address, created_at, updated_at FROM customers WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<CustomerRow>();
+      return row ? mapCustomer(row) : null;
+    },
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO customers (id, user_id, name, email, phone, company, address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.name,
+          record.email,
+          record.phone,
+          record.company,
+          record.address,
+          record.createdAt,
+          record.updatedAt,
+        )
+        .run();
+    },
+    async update(record) {
+      await db
+        .prepare(
+          "UPDATE customers SET name = ?, email = ?, phone = ?, company = ?, address = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+        .bind(
+          record.name,
+          record.email,
+          record.phone,
+          record.company,
+          record.address,
+          record.updatedAt,
+          record.id,
+          record.userId,
+        )
+        .run();
+    },
+    async delete(id, userId) {
+      const existing = await db
+        .prepare("SELECT id FROM customers WHERE id = ? AND user_id = ? LIMIT 1")
+        .bind(id, userId)
+        .first<{ id: string }>();
+      if (!existing) {
+        return false;
+      }
+      await db
+        .prepare("DELETE FROM customers WHERE id = ? AND user_id = ?")
+        .bind(id, userId)
+        .run();
+      return true;
+    },
+  };
+
+  const invoices: InvoiceRepository = {
+    async listByUser(userId, query) {
+      const like = likeContains(query);
+      const result = like
+        ? await db
+            .prepare(
+              "SELECT id, user_id, invoice_number, status, currency, invoice_data, created_at, updated_at FROM invoices WHERE user_id = ? AND (invoice_number LIKE ? OR status LIKE ? OR invoice_data LIKE ?) ORDER BY updated_at DESC",
+            )
+            .bind(userId, like, like, like)
+            .all<InvoiceRow>()
+        : await db
+            .prepare(
+              "SELECT id, user_id, invoice_number, status, currency, invoice_data, created_at, updated_at FROM invoices WHERE user_id = ? ORDER BY updated_at DESC",
+            )
+            .bind(userId)
+            .all<InvoiceRow>();
+      return result.results.map(mapInvoice);
+    },
+    async findById(id) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, invoice_number, status, currency, invoice_data, created_at, updated_at FROM invoices WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<InvoiceRow>();
+      return row ? mapInvoice(row) : null;
+    },
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO invoices (id, user_id, invoice_number, status, currency, invoice_data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.invoiceNumber,
+          record.status,
+          record.currency,
+          record.invoiceData,
+          record.createdAt,
+          record.updatedAt,
+        )
+        .run();
+    },
+    async update(record) {
+      await db
+        .prepare(
+          "UPDATE invoices SET invoice_number = ?, status = ?, currency = ?, invoice_data = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+        .bind(
+          record.invoiceNumber,
+          record.status,
+          record.currency,
+          record.invoiceData,
+          record.updatedAt,
+          record.id,
+          record.userId,
+        )
+        .run();
+    },
+    async delete(id, userId) {
+      const existing = await db
+        .prepare("SELECT id FROM invoices WHERE id = ? AND user_id = ? LIMIT 1")
+        .bind(id, userId)
+        .first<{ id: string }>();
+      if (!existing) {
+        return false;
+      }
+      await db
+        .prepare("DELETE FROM invoices WHERE id = ? AND user_id = ?")
+        .bind(id, userId)
+        .run();
+      return true;
+    },
+    async countByUser(userId) {
+      const row = await db
+        .prepare("SELECT COUNT(*) AS count FROM invoices WHERE user_id = ?")
+        .bind(userId)
+        .first<{ count: number }>();
+      return Number(row?.count ?? 0);
+    },
+  };
+
+  const profiles: BusinessProfileRepository = {
+    async findByUserId(userId) {
+      const row = await db
+        .prepare(
+          "SELECT user_id, business_name, name, email, phone, website, address, logo_url, updated_at FROM business_profiles WHERE user_id = ? LIMIT 1",
+        )
+        .bind(userId)
+        .first<ProfileRow>();
+      return row ? mapProfile(row) : null;
+    },
+    async upsert(record) {
+      await db
+        .prepare(
+          `INSERT INTO business_profiles (user_id, business_name, name, email, phone, website, address, logo_url, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET
+             business_name = excluded.business_name,
+             name = excluded.name,
+             email = excluded.email,
+             phone = excluded.phone,
+             website = excluded.website,
+             address = excluded.address,
+             logo_url = excluded.logo_url,
+             updated_at = excluded.updated_at`,
+        )
+        .bind(
+          record.userId,
+          record.businessName,
+          record.name,
+          record.email,
+          record.phone,
+          record.website,
+          record.address,
+          record.logoUrl,
+          record.updatedAt,
+        )
+        .run();
+    },
+  };
+
+  const rateLimits: RateLimitStore = {
+    async hit(action, key, nowIso, windowMs) {
+      const cutoff = new Date(new Date(nowIso).getTime() - windowMs).toISOString();
+      await db
+        .prepare("DELETE FROM auth_attempts WHERE created_at < ?")
+        .bind(cutoff)
+        .run();
+      await db
+        .prepare(
+          "INSERT INTO auth_attempts (action, key, created_at) VALUES (?, ?, ?)",
+        )
+        .bind(action, key, nowIso)
+        .run();
+      const row = await db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM auth_attempts WHERE action = ? AND key = ? AND created_at >= ?",
+        )
+        .bind(action, key, cutoff)
+        .first<{ count: number }>();
+      return Number(row?.count ?? 0);
+    },
+  };
+
+  return {
+    users,
+    sessions,
+    signatures,
+    cards,
+    qrCodes,
+    customers,
+    invoices,
+    profiles,
+    rateLimits,
+  };
+}

@@ -1,6 +1,8 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { Suspense, useEffect, useId, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { SignatureSaveControls } from "@/components/email-signature-generator/SignatureSaveControls";
 import { ToolWorkspace } from "@/components/tools/ToolWorkspace";
 import { Button } from "@/components/ui/Button";
 import { ClearButton } from "@/components/ui/ClearButton";
@@ -27,6 +29,7 @@ import {
   type SignatureOptions,
   type SignatureTemplateId,
 } from "@/lib/tools/email-signature-generator";
+import { getSignature } from "@/lib/pro/api";
 
 const FONT_LABELS: Record<EmailSafeFont, string> = {
   arial: "Arial",
@@ -206,12 +209,42 @@ function ImageField({
 }
 
 export default function EmailSignatureTool() {
+  return (
+    <Suspense fallback={<p className="text-sm text-muted">Loading signature editor…</p>}>
+      <EmailSignatureEditor />
+    </Suspense>
+  );
+}
+
+function EmailSignatureEditor() {
   const formId = useId();
+  const searchParams = useSearchParams();
+  const requestedId = searchParams.get("signature");
   const [input, setInput] = useState<SignatureInput>(EXAMPLE_INPUT);
   const [copyStatus, setCopyStatus] = useState<"idle" | "html" | "rich" | "error">("idle");
   const [copyError, setCopyError] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedName, setSavedName] = useState("Work Signature");
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!requestedId) {
+      return;
+    }
+
+    void getSignature(requestedId)
+      .then((result) => {
+        setInput(result.signature.data as SignatureInput);
+        setSavedId(result.signature.id);
+        setSavedName(result.signature.name);
+        setLoadError(null);
+      })
+      .catch(() => {
+        setLoadError("That saved signature could not be opened. Sign in and try again.");
+      });
+  }, [requestedId]);
 
   const rendered = useMemo(() => renderSignature(input), [input]);
 
@@ -489,6 +522,26 @@ export default function EmailSignatureTool() {
               {warning}
             </Feedback>
           ))}
+
+          {loadError ? (
+            <Feedback tone="error" live>
+              {loadError}
+            </Feedback>
+          ) : null}
+
+          <SignatureSaveControls
+            key={savedId ?? "new"}
+            input={input}
+            savedId={savedId}
+            savedName={savedName}
+            onSaved={(id, name, warnings) => {
+              setSavedId(id);
+              setSavedName(name);
+              if (warnings.length > 0) {
+                setLoadError(null);
+              }
+            }}
+          />
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button variant="primary" onClick={() => void handleCopyRich()}>

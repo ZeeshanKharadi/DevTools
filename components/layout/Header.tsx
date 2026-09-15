@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthNav } from "@/components/auth/AuthNav";
 import { SITE_NAME } from "@/lib/site";
 import { Container } from "./Container";
 import { ThemeToggle } from "./ThemeToggle";
@@ -34,7 +35,10 @@ export function Header() {
             </ul>
           </nav>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-4">
+          <AuthNav />
+          <ThemeToggle />
+        </div>
       </Container>
     </header>
   );

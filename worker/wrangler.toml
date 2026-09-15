@@ -1,0 +1,26 @@
+name = "infyratools-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-07"
+
+[vars]
+APP_ORIGIN = "http://localhost:3000"
+PUBLIC_BASE_URL = "http://localhost:8787"
+COOKIE_SECURE = "false"
+COOKIE_SAMESITE = "lax"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "infyratools"
+database_id = "replace-with-cloudflare-d1-id"
+migrations_dir = "migrations"
+
+# Production (set in the Cloudflare dashboard or wrangler secret/vars):
+# APP_ORIGIN = "https://infyratools.com"
+# PUBLIC_BASE_URL = "https://infyratools.com"
+# COOKIE_SECURE = "true"
+# COOKIE_SAMESITE = "lax"
+#
+# Route the Worker to the same hostname as the static site:
+# infyratools.com/api/*
+# infyratools.com/card/*
+# infyratools.com/q/*

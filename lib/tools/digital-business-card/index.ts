@@ -22,6 +22,7 @@ export {
   isCardTemplate,
 } from "./constants";
 export { prepareCard, splitName } from "./prepare";
+export { parseStoredCardInput } from "./stored";
 export {
   buildContactVCard,
   buildDownloadVCard,

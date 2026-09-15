@@ -29,6 +29,16 @@ describe("splitName / prepareCard", () => {
     );
     expect(prepared.warnings.length).toBeGreaterThan(0);
   });
+
+  it("accepts hosted https images for public cards", () => {
+    const prepared = prepareCard({
+      ...EXAMPLE_INPUT,
+      photoDataUrl: "https://cdn.example.com/photo.png",
+      logoDataUrl: "https://cdn.example.com/logo.png",
+    });
+    expect(prepared.photoSrc).toBe("https://cdn.example.com/photo.png");
+    expect(prepared.logoSrc).toBe("https://cdn.example.com/logo.png");
+  });
 });
 
 describe("vCard and QR payload", () => {

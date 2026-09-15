@@ -285,3 +285,9 @@ Domain is TBD. Metadata will use a configurable site URL (env `NEXT_PUBLIC_SITE_
 - Worker threads / WASM (revisit only if large-JSON performance demands it)
 - PWA / offline cache of previous inputs
 - i18n
+
+---
+
+## Phase 3A (accounts)
+
+The public site remains `output: "export"`. Authentication and saved email signatures live in `worker/` (Cloudflare Worker + D1). See `docs/PHASE_3A.md`.

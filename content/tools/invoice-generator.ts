@@ -2,9 +2,9 @@ import type { ToolContent } from "./types";
 
 export const invoiceGeneratorContent: ToolContent = {
   privacy:
-    "Processed locally — customer names, amounts, and bank notes never leave your browser.",
+    "Preview, print, and PDF stay in your browser. Signing in to save an invoice is optional and stores structured invoice details in your InfyraTools account — not generated PDF files.",
   intro:
-    "This free invoice generator builds a professional invoice in your browser. Add seller and customer details, line items, tax, and discounts, then print or download a PDF. The printed document is the invoice only — not the site chrome.",
+    "This free invoice generator builds a professional invoice in your browser. Add seller and customer details, line items, tax, and discounts, then print or download a PDF. The printed document is the invoice only — not the site chrome. Sign in only if you want to save invoices.",
   howTo: [
     {
       title: "Enter both parties",
@@ -35,8 +35,8 @@ export const invoiceGeneratorContent: ToolContent = {
       body: "Per-line tax percents are arithmetic, not a filing. Confirm rates, tax IDs, and required fields for the country you invoice in.",
     },
     {
-      title: "Keep records yourself",
-      body: "Nothing is saved on a server. Download the PDF if you need a copy. A later Pro option could store invoices without changing this calculator.",
+      title: "Keep records",
+      body: "Anonymous invoices are not stored. Download the PDF if you need a copy, or sign in to save structured invoice data to your account. This tool still does not send email or collect payment.",
     },
   ],
   bestPracticesHeading: "Invoice tips",
@@ -44,7 +44,7 @@ export const invoiceGeneratorContent: ToolContent = {
     {
       question: "Is this a free invoice generator?",
       answer:
-        "Yes. You can build, print, and download an invoice in the browser. There is no account, and customer data is not uploaded.",
+        "Yes. You can build, print, and download an invoice in the browser without an account. Saving invoices is optional after you sign in.",
     },
     {
       question: "Does the PDF or printout include the website UI?",

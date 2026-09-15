@@ -20,6 +20,7 @@ export {
   SOCIAL_NETWORKS,
 } from "./types";
 export { copyRichHtml, isSignatureTemplateId, renderSignature } from "./render";
+export { prepareSignature } from "./prepare";
 export {
   escapeHtml,
   sanitizeColor,
@@ -28,7 +29,7 @@ export {
   sanitizeImageSrc,
   sanitizePhone,
 } from "./sanitize";
-export { prepareSignature } from "./prepare";
+export { parseSignatureName, parseStoredSignatureInput } from "./stored";
 export type {
   EmailSafeFont,
   ImageOrigin,

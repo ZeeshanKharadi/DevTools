@@ -3,8 +3,8 @@ export const SITE_NAME = "InfyraTools";
 export const PARENT_BRAND = "InfyraEdge";
 export const PARENT_BRAND_URL = "https://infyraedge.com";
 
-export const LEGAL_EFFECTIVE_DATE = "2026-09-07";
-export const LEGAL_EFFECTIVE_LABEL = "7 September 2026";
+export const LEGAL_EFFECTIVE_DATE = "2026-09-14";
+export const LEGAL_EFFECTIVE_LABEL = "14 September 2026";
 
 export const LEGAL_PAGES = [
   {

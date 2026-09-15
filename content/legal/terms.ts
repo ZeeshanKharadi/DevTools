@@ -4,10 +4,10 @@ export const termsOfUse: LegalDocument = {
   path: "/terms",
   title: "Terms of Use",
   description:
-    "Terms of Use for InfyraTools, the free browser-based tools published as a product of InfyraEdge.",
+    "Terms of Use for InfyraTools, including free browser-based tools and optional accounts for saved email signatures.",
   h1: "Terms of Use",
   intro:
-    "These Terms of Use govern access to and use of InfyraTools, including infyratools.com and the free tools published there. By using InfyraTools, you agree to these terms.",
+    "These Terms of Use govern access to and use of InfyraTools, including infyratools.com, the free tools published there, and optional InfyraTools accounts. By using InfyraTools, you agree to these terms.",
   sections: [
     {
       heading: "Acceptance of terms",
@@ -25,13 +25,21 @@ export const termsOfUse: LegalDocument = {
       heading: "Description of the service",
       paragraphs: [
         "InfyraTools provides free online tools that run in your browser. Current tools include utilities for formatting and inspecting data, encoding and decoding text, generating identifiers and schedule expressions, converting timestamps, testing patterns, formatting SQL, and creating business assets such as email signatures, QR codes, invoices, and digital business cards.",
-        "InfyraTools is published as a static website. It does not currently offer user accounts, paid subscriptions, saved cloud workspaces, hosted payment collection, or customer support tickets inside the product.",
+        "You may optionally create a free InfyraTools account to save email signatures. InfyraTools does not currently offer paid subscriptions, payment processing, hosted business cards, dynamic QR codes, saved invoices, or customer support tickets inside the product.",
       ],
     },
     {
       heading: "Free online tools",
       paragraphs: [
-        "The tools on InfyraTools are offered free of charge in their current form. These terms do not create a paid service, refund policy, or subscription. If paid features are introduced later, separate terms will describe them.",
+        "The tools on InfyraTools are offered free of charge in their current form, including optional accounts used to save email signatures. These terms do not create a paid service, refund policy, or subscription. If paid features are introduced later, separate terms will describe them.",
+      ],
+    },
+    {
+      heading: "Accounts",
+      paragraphs: [
+        "Account registration is optional. If you register, you must provide a valid email address and a password, and you are responsible for keeping that password confidential and for activity on your account.",
+        "Saved email signatures belong to the account that created them. You may not attempt to access another person’s account, sessions, or saved signatures. InfyraTools may suspend or remove an account that is used abusively or in violation of these terms.",
+        "Signing in uses a first-party session cookie. Signing out ends that session. InfyraTools does not currently provide social login, multi-factor authentication, or a paid identity provider.",
       ],
     },
     {
@@ -77,7 +85,7 @@ export const termsOfUse: LegalDocument = {
     {
       heading: "Third-party links and services",
       paragraphs: [
-        "The site may link to InfyraEdge or other third-party websites. Tools may produce links or codes that open destinations you choose. Those destinations are not part of InfyraTools and are not covered by these terms. InfyraTools does not currently integrate advertising, analytics, payments, or account providers.",
+        "The site may link to InfyraEdge or other third-party websites. Tools may produce links or codes that open destinations you choose. Those destinations are not part of InfyraTools and are not covered by these terms. InfyraTools does not currently integrate advertising, analytics, or payment providers.",
       ],
     },
     {
@@ -114,7 +122,7 @@ export const termsOfUse: LegalDocument = {
     {
       heading: "Contact",
       paragraphs: [
-        "Questions about these Terms of Use may be directed to InfyraEdge through infyraedge.com. InfyraTools does not currently provide in-product accounts or a billing relationship.",
+        "Questions about these Terms of Use may be directed to InfyraEdge through infyraedge.com. InfyraTools does not currently provide a billing relationship.",
       ],
     },
   ],

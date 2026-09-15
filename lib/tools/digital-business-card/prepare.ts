@@ -16,7 +16,7 @@ import {
   stripControlChars,
   telDigits,
   trimField,
-} from "@/lib/tools/qr-code-generator";
+} from "../qr-code-generator/sanitize";
 import { CARD_SOCIALS } from "./types";
 import type { CardInput, CardSocialId, PreparedCard, PreparedSocial } from "./types";
 
@@ -39,6 +39,19 @@ function socialHref(id: CardSocialId, raw: string): string | null {
   if (!value) {
     return null;
   }
+  return sanitizeHttpUrl(value);
+}
+
+function resolveCardImage(raw: string | null): string | null {
+  if (!raw) {
+    return null;
+  }
+
+  const value = raw.trim();
+  if (value.startsWith("data:image/")) {
+    return sanitizeDataImageUrl(value);
+  }
+
   return sanitizeHttpUrl(value);
 }
 
@@ -75,12 +88,8 @@ export function prepareCard(input: CardInput): PreparedCard {
     }
   }
 
-  const photo = input.photoDataUrl
-    ? sanitizeDataImageUrl(input.photoDataUrl)
-    : null;
-  const logo = input.logoDataUrl
-    ? sanitizeDataImageUrl(input.logoDataUrl)
-    : null;
+  const photo = resolveCardImage(input.photoDataUrl);
+  const logo = resolveCardImage(input.logoDataUrl);
   if (input.photoDataUrl && !photo) {
     warnings.push("Profile photo was omitted. Use a PNG, JPEG, GIF, or WebP image.");
   }

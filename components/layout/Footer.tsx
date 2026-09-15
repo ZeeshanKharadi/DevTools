@@ -13,8 +13,8 @@ export function Footer() {
         <div className="space-y-3">
           <p className="text-sm font-semibold text-foreground">{SITE_NAME}</p>
           <p className="max-w-sm text-sm text-muted">
-            Free developer tools that run in your browser. Your input is not
-            uploaded.
+            Free developer tools that run in your browser. Saving to an account
+            is optional.
           </p>
           <ParentBrandLine className="max-w-sm" />
         </div>
@@ -67,7 +67,8 @@ export function Footer() {
       </Container>
       <Container className="border-t border-line py-4">
         <p className="text-xs text-muted">
-          Processed locally. No accounts. No tracking of tool input.
+          Processed locally by default. Accounts are optional. No tracking of
+          tool input.
         </p>
       </Container>
     </footer>

@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { Suspense, useEffect, useId, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ProfileFillButton } from "@/components/account/ProfileFillButton";
+import { CardSaveControls } from "@/components/digital-business-card/CardSaveControls";
 import { ToolWorkspace } from "@/components/tools/ToolWorkspace";
 import { Button } from "@/components/ui/Button";
 import { ClearButton } from "@/components/ui/ClearButton";
@@ -32,6 +35,7 @@ import {
   type CardTemplateId,
 } from "@/lib/tools/digital-business-card";
 import type { QrRenderResult } from "@/lib/tools/qr-code-generator";
+import { getCard } from "@/lib/pro/api";
 
 const FIELD_ROWS = [
   { key: "fullName" as const, label: "Full name" },
@@ -276,12 +280,44 @@ function CardBody({
 }
 
 export default function DigitalBusinessCardTool() {
+  return (
+    <Suspense fallback={<p className="text-sm text-muted">Loading card editor…</p>}>
+      <DigitalBusinessCardEditor />
+    </Suspense>
+  );
+}
+
+function DigitalBusinessCardEditor() {
   const formId = useId();
+  const searchParams = useSearchParams();
+  const requestedId = searchParams.get("card");
   const [input, setInput] = useState<CardInput>(EXAMPLE_INPUT);
   const [qr, setQr] = useState<QrRenderResult | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const [imageError, setImageError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedName, setSavedName] = useState("Work card");
+  const [savedSlug, setSavedSlug] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!requestedId) {
+      return;
+    }
+
+    void getCard(requestedId)
+      .then((result) => {
+        setInput(result.card.data as CardInput);
+        setSavedId(result.card.id);
+        setSavedName(result.card.name);
+        setSavedSlug(result.card.publicSlug);
+        setLoadError(null);
+      })
+      .catch(() => {
+        setLoadError("That saved card could not be opened. Sign in and try again.");
+      });
+  }, [requestedId]);
 
   const prepared = useMemo(() => prepareCard(input), [input]);
 
@@ -343,6 +379,22 @@ export default function DigitalBusinessCardTool() {
         >
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold">Contact details</legend>
+            <ProfileFillButton
+              label="Fill from business profile"
+              onProfile={(profile) => {
+                const patch: Partial<CardFields> = {};
+                if (profile.name) patch.fullName = profile.name;
+                if (profile.businessName) patch.company = profile.businessName;
+                if (profile.email) patch.email = profile.email;
+                if (profile.phone) patch.phone = profile.phone;
+                if (profile.website) patch.website = profile.website;
+                if (profile.address) patch.address = profile.address;
+                patchFields(patch);
+                if (profile.logoUrl) {
+                  setInput((current) => ({ ...current, logoDataUrl: profile.logoUrl }));
+                }
+              }}
+            />
             {FIELD_ROWS.map((field) => (
               <div key={field.key} className="space-y-1">
                 <label htmlFor={`${formId}-${field.key}`} className="text-sm font-medium">
@@ -397,6 +449,23 @@ export default function DigitalBusinessCardTool() {
                   Remove photo
                 </Button>
               ) : null}
+              <label htmlFor={`${formId}-photo-url`} className="text-xs text-muted">
+                Or hosted photo URL (https)
+              </label>
+              <Input
+                id={`${formId}-photo-url`}
+                type="url"
+                placeholder="https://…"
+                value={
+                  input.photoDataUrl?.startsWith("http") ? input.photoDataUrl : ""
+                }
+                onChange={(event) =>
+                  setInput((current) => ({
+                    ...current,
+                    photoDataUrl: event.target.value || null,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <label htmlFor={`${formId}-logo`} className="text-sm font-medium">
@@ -420,6 +489,21 @@ export default function DigitalBusinessCardTool() {
                   Remove logo
                 </Button>
               ) : null}
+              <label htmlFor={`${formId}-logo-url`} className="text-xs text-muted">
+                Or hosted logo URL (https)
+              </label>
+              <Input
+                id={`${formId}-logo-url`}
+                type="url"
+                placeholder="https://…"
+                value={input.logoDataUrl?.startsWith("http") ? input.logoDataUrl : ""}
+                onChange={(event) =>
+                  setInput((current) => ({
+                    ...current,
+                    logoDataUrl: event.target.value || null,
+                  }))
+                }
+              />
             </div>
             {imageError ? (
               <p className="text-xs text-danger" role="alert">
@@ -594,10 +678,10 @@ export default function DigitalBusinessCardTool() {
           <CardPreview input={input} qr={prepared.fullName ? qr : null} />
 
           <Feedback>
-            This is a local contact card, not a hosted page. There is no public
-            URL such as infyratools.com/card/username. Photos stay on this
-            device. The QR code is a static vCard generated with the existing QR
-            encoder.
+            Anonymous use stays local: preview, vCard, and PNG never require an
+            account. Signed-in users can host a public page at
+            /card/&lt;slug&gt;. Local file photos are not stored; use an https://
+            image URL if the public card should show a photo or logo.
           </Feedback>
 
           {prepared.warnings.map((warning) => (
@@ -608,6 +692,24 @@ export default function DigitalBusinessCardTool() {
               {actionError}
             </Feedback>
           ) : null}
+          {loadError ? (
+            <Feedback tone="error" live>
+              {loadError}
+            </Feedback>
+          ) : null}
+
+          <CardSaveControls
+            key={savedId ?? "new"}
+            input={input}
+            savedId={savedId}
+            savedName={savedName}
+            savedSlug={savedSlug}
+            onSaved={(id, name, slug) => {
+              setSavedId(id);
+              setSavedName(name);
+              setSavedSlug(slug);
+            }}
+          />
 
           {!prepared.fullName ? (
             <p className="text-sm text-muted">

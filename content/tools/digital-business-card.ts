@@ -2,9 +2,9 @@ import type { ToolContent } from "./types";
 
 export const digitalBusinessCardContent: ToolContent = {
   privacy:
-    "Processed locally — names, photos, and contact details never leave your browser.",
+    "Preview, vCard, and PNG stay in your browser. Signing in to host a card is optional and stores structured contact details in your InfyraTools account.",
   intro:
-    "This free digital business card generator builds a contact card you can preview, download as a vCard, or export as a PNG. The QR code encodes a static vCard. It is not a hosted page and does not give you a public URL.",
+    "This free digital business card generator builds a contact card you can preview, download as a vCard, or export as a PNG. The QR code encodes a static vCard. Without an account the card stays on this device. Signed-in users can also publish a hosted page.",
   howTo: [
     {
       title: "Add your details",
@@ -16,7 +16,7 @@ export const digitalBusinessCardContent: ToolContent = {
     },
     {
       title: "Download or copy",
-      body: "Download vCard for phone contacts, Download PNG for a shareable image, or copy a plain-text contact block. Reset clears the form. Nothing is published to infyratools.com/card/…",
+      body: "Download vCard for phone contacts, Download PNG for a shareable image, or copy a plain-text contact block. Reset clears the form. Sign in if you want a public InfyraTools URL.",
     },
   ],
   examples: [
@@ -31,8 +31,8 @@ export const digitalBusinessCardContent: ToolContent = {
   ],
   bestPractices: [
     {
-      title: "This is not a hosted card",
-      body: "There is no permanent public page. If the file is lost, the card is gone. A later Pro option could host cards at a URL such as infyratools.com/card/username.",
+      title: "Hosting is optional",
+      body: "The free generator still works without an account. A hosted page at /card/<slug> is only created when you sign in and save. Local file photos are not stored; use an https:// image URL for public photos.",
     },
     {
       title: "Keep the QR small",
@@ -44,12 +44,12 @@ export const digitalBusinessCardContent: ToolContent = {
     {
       question: "Is this a free digital business card generator?",
       answer:
-        "Yes. You can design a contact card, download a vCard, and export a PNG in the browser. There is no account.",
+        "Yes. You can design a contact card, download a vCard, and export a PNG in the browser without an account.",
     },
     {
       question: "Do I get a public URL for my card?",
       answer:
-        "No. This free generator does not create infyratools.com/card/username or any other hosted link. Hosted cards, custom domains, and analytics would need a server.",
+        "Not from the anonymous generator. Sign in and save the card to publish a public page at infyratools.com/card/<slug>. Custom domains are not available yet.",
     },
     {
       question: "What is in the QR code?",

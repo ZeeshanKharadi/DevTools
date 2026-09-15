@@ -54,6 +54,7 @@ export {
   effectiveErrorCorrection,
   overlayLogoOnPng,
   overlayLogoOnSvg,
+  renderQrText,
   renderStaticQr,
 } from "./encode";
 export type {

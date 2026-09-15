@@ -1,6 +1,10 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { Suspense, useEffect, useId, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ProfileFillButton } from "@/components/account/ProfileFillButton";
+import { CustomerPicker } from "@/components/invoice-generator/CustomerPicker";
+import { InvoiceSaveControls } from "@/components/invoice-generator/InvoiceSaveControls";
 import { ToolWorkspace } from "@/components/tools/ToolWorkspace";
 import { Button } from "@/components/ui/Button";
 import { ClearButton } from "@/components/ui/ClearButton";
@@ -32,6 +36,8 @@ import {
   type InvoiceParty,
   type InvoiceTemplateId,
 } from "@/lib/tools/invoice-generator";
+import { getInvoice } from "@/lib/pro/api";
+import type { InvoiceStatus } from "@/lib/tools/invoice-generator/stored";
 
 function Field({
   id,
@@ -124,11 +130,45 @@ async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export default function InvoiceTool() {
+  return (
+    <Suspense fallback={<p className="text-sm text-muted">Loading invoice editor…</p>}>
+      <InvoiceEditor />
+    </Suspense>
+  );
+}
+
+function InvoiceEditor() {
   const formId = useId();
+  const searchParams = useSearchParams();
+  const requestedId = searchParams.get("invoice");
   const [input, setInput] = useState<InvoiceInput>(EXAMPLE_INPUT);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [lineCount, setLineCount] = useState(EXAMPLE_INPUT.lines.length);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedNumber, setSavedNumber] = useState(EXAMPLE_INPUT.meta.number);
+  const [savedStatus, setSavedStatus] = useState<InvoiceStatus>("draft");
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!requestedId) {
+      return;
+    }
+
+    void getInvoice(requestedId)
+      .then((result) => {
+        const data = result.invoice.data as InvoiceInput;
+        setInput(data);
+        setSavedId(result.invoice.id);
+        setSavedNumber(result.invoice.invoiceNumber);
+        setSavedStatus(result.invoice.status);
+        setLineCount(data.lines.length);
+        setLoadError(null);
+      })
+      .catch(() => {
+        setLoadError("That saved invoice could not be opened. Sign in and try again.");
+      });
+  }, [requestedId]);
 
   const rendered = useMemo(() => renderInvoice(input), [input]);
 
@@ -163,11 +203,34 @@ export default function InvoiceTool() {
             party={input.seller}
             onChange={(seller) => setInput((current) => ({ ...current, seller }))}
           />
+          <ProfileFillButton
+            label="Fill seller from business profile"
+            onProfile={(profile) =>
+              setInput((current) => ({
+                ...current,
+                seller: {
+                  ...current.seller,
+                  company: profile.businessName || current.seller.company,
+                  name: profile.name || current.seller.name,
+                  email: profile.email || current.seller.email,
+                  phone: profile.phone || current.seller.phone,
+                  website: profile.website || current.seller.website,
+                  address: profile.address || current.seller.address,
+                },
+                logoDataUrl: profile.logoUrl || current.logoDataUrl,
+              }))
+            }
+          />
           <PartyFields
             id={`${formId}-customer`}
             title="Customer / bill to"
             party={input.customer}
             onChange={(customer) =>
+              setInput((current) => ({ ...current, customer }))
+            }
+          />
+          <CustomerPicker
+            onSelect={(customer) =>
               setInput((current) => ({ ...current, customer }))
             }
           />
@@ -485,10 +548,9 @@ export default function InvoiceTool() {
           </div>
 
           <Feedback>
-            Totals stay on this device. This is not tax, accounting, or legal
-            advice, and it does not claim to meet every country&apos;s invoice
-            rules. Saved invoices, payment links, and cloud sync are not part of
-            this browser-only generator.
+            Anonymous use stays on this device: preview, print, and PDF never
+            require an account. Signed-in users can save invoices and reuse
+            customers. Totals are not tax, accounting, or legal advice.
           </Feedback>
 
           {rendered.ok
@@ -506,6 +568,27 @@ export default function InvoiceTool() {
               {actionError}
             </Feedback>
           ) : null}
+          {loadError ? (
+            <Feedback tone="error" live>
+              {loadError}
+            </Feedback>
+          ) : null}
+
+          <InvoiceSaveControls
+            key={savedId ?? "new"}
+            input={input}
+            savedId={savedId}
+            savedNumber={savedNumber || input.meta.number}
+            savedStatus={savedStatus}
+            onSaved={(id, number, status, warnings) => {
+              setSavedId(id);
+              setSavedNumber(number);
+              setSavedStatus(status);
+              if (warnings.length > 0) {
+                setLoadError(null);
+              }
+            }}
+          />
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
