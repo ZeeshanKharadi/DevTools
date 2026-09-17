@@ -7,7 +7,7 @@ This phase adds account products on top of the Phase 3A Worker + D1 foundation. 
 ```
 Browser (static Pages site)
   ├── 14 free tools (unchanged anonymous behavior)
-  └── /login /register /dashboard/*
+  └── /login /register /verify-email /dashboard/*
            │  JSON + HttpOnly cookie
            ▼
 Cloudflare Worker
@@ -27,7 +27,8 @@ Service layer  →  repository interfaces  →  D1
 
 | URL | Handler | Notes |
 |---|---|---|
-| `/dashboard`, `/dashboard/signatures`, `/dashboard/cards`, `/dashboard/qr`, `/dashboard/invoices`, `/dashboard/customers`, `/dashboard/account` | Static Next pages | Client-side auth redirect to `/login` |
+| `/dashboard`, `/dashboard/signatures`, `/dashboard/cards`, `/dashboard/qr`, `/dashboard/invoices`, `/dashboard/customers`, `/dashboard/account` | Static Next pages | Client-side auth redirect to `/login`, or `/verify-email` if the session is unverified |
+| `/verify-email` | Static Next page | 6-digit OTP entry and resend |
 | `/card/<slug>` | Worker HTML | Active cards only. Text is escaped. No user HTML. https images only. Title/description/canonical come from the saved card; pages are `noindex, nofollow` because this is user-generated content on the tools domain. |
 | `/q/<code>` | Worker redirect | Active: **302** to destination. Inactive: **410**. Missing: **404**. |
 | `/api/*` | Worker JSON | Same Phase 3A cookie/session model |
@@ -45,7 +46,7 @@ Added:
 - `invoices` — JSON `invoice_data` plus `invoice_number`, `status`, `currency`
 - `business_profiles` — one optional row per user
 
-Existing `users`, `sessions`, `email_signatures`, `auth_attempts` are unchanged. Foreign keys use **ON DELETE CASCADE**. Ownership is still enforced in services; a client-supplied `user_id` is ignored.
+Existing `users`, `sessions`, `email_signatures`, `auth_attempts` remain. Migration `0003_email_verification.sql` adds `users.email_verified_at` (existing rows backfilled from `created_at`) and `email_verification_challenges`. Foreign keys use **ON DELETE CASCADE**. Ownership is still enforced in services; a client-supplied `user_id` is ignored.
 
 ## Products
 

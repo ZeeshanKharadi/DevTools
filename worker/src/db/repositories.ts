@@ -3,6 +3,7 @@ import type {
   BusinessProfileRecord,
   CustomerRecord,
   DynamicQrRecord,
+  EmailVerificationRecord,
   InvoiceRecord,
   SessionRecord,
   SignatureRecord,
@@ -13,6 +14,19 @@ export interface UserRepository {
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
   create(user: UserRecord): Promise<void>;
+  markEmailVerified(userId: string, verifiedAt: string): Promise<void>;
+}
+
+export interface EmailVerificationRepository {
+  create(record: EmailVerificationRecord): Promise<void>;
+  findActiveByUserId(
+    userId: string,
+    nowIso: string,
+  ): Promise<EmailVerificationRecord | null>;
+  findLatestByUserId(userId: string): Promise<EmailVerificationRecord | null>;
+  consume(id: string, consumedAt: string): Promise<void>;
+  consumeAllForUser(userId: string, consumedAt: string): Promise<void>;
+  incrementFailures(id: string): Promise<number>;
 }
 
 export interface SessionRepository {
@@ -83,6 +97,7 @@ export interface RateLimitStore {
 export type Repositories = {
   users: UserRepository;
   sessions: SessionRepository;
+  verifications: EmailVerificationRepository;
   signatures: SignatureRepository;
   cards: CardRepository;
   qrCodes: QrCodeRepository;

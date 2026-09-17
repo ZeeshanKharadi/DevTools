@@ -13,6 +13,7 @@ APP_ORIGIN = "https://infyratools.com"
 PUBLIC_BASE_URL = "https://infyratools.com"
 COOKIE_SECURE = "true"
 COOKIE_SAMESITE = "lax"
+EMAIL_FROM = "InfyraTools <noreply@infyratools.com>"
 
 [[d1_databases]]
 binding = "DB"
@@ -34,3 +35,6 @@ zone_name = "infyratools.com"
 
 # Local `wrangler dev` overrides vars via worker/.dev.vars (not committed).
 # Local D1 still uses --local and does not touch this remote database.
+# Email: set EMAIL_PROVIDER=console in .dev.vars for local OTP logs.
+# Production uses RESEND_API_KEY (Wrangler secret, never this file) and EMAIL_FROM.
+# Do not put API keys in this file.

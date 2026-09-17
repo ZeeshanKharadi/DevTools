@@ -2,6 +2,7 @@ import type {
   BusinessProfileRepository,
   CardRepository,
   CustomerRepository,
+  EmailVerificationRepository,
   InvoiceRepository,
   QrCodeRepository,
   RateLimitStore,
@@ -15,6 +16,7 @@ import type {
   BusinessProfileRecord,
   CustomerRecord,
   DynamicQrRecord,
+  EmailVerificationRecord,
   InvoiceRecord,
   SessionRecord,
   SignatureRecord,
@@ -37,6 +39,7 @@ function matchesInvoiceQuery(record: InvoiceRecord, query?: string): boolean {
 export function createMemoryRepositories(): Repositories {
   const users: UserRecord[] = [];
   const sessions: SessionRecord[] = [];
+  const verifications: EmailVerificationRecord[] = [];
   const signatures: SignatureRecord[] = [];
   const cards: BusinessCardRecord[] = [];
   const qrCodes: DynamicQrRecord[] = [];
@@ -58,6 +61,59 @@ export function createMemoryRepositories(): Repositories {
         throw new Error("UNIQUE_EMAIL");
       }
       users.push(user);
+    },
+    async markEmailVerified(userId, verifiedAt) {
+      const user = users.find((item) => item.id === userId);
+      if (user && !user.emailVerifiedAt) {
+        user.emailVerifiedAt = verifiedAt;
+        user.updatedAt = verifiedAt;
+      }
+    },
+  };
+
+  const verificationRepo: EmailVerificationRepository = {
+    async create(record) {
+      verifications.push(record);
+    },
+    async findActiveByUserId(userId, nowIso) {
+      return (
+        verifications
+          .filter(
+            (item) =>
+              item.userId === userId &&
+              item.consumedAt === null &&
+              item.expiresAt > nowIso,
+          )
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null
+      );
+    },
+    async findLatestByUserId(userId) {
+      return (
+        verifications
+          .filter((item) => item.userId === userId)
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null
+      );
+    },
+    async consume(id, consumedAt) {
+      const record = verifications.find((item) => item.id === id);
+      if (record && record.consumedAt === null) {
+        record.consumedAt = consumedAt;
+      }
+    },
+    async consumeAllForUser(userId, consumedAt) {
+      for (const record of verifications) {
+        if (record.userId === userId && record.consumedAt === null) {
+          record.consumedAt = consumedAt;
+        }
+      }
+    },
+    async incrementFailures(id) {
+      const record = verifications.find((item) => item.id === id);
+      if (!record) {
+        return 0;
+      }
+      record.failedAttempts += 1;
+      return record.failedAttempts;
     },
   };
 
@@ -327,6 +383,7 @@ export function createMemoryRepositories(): Repositories {
   return {
     users: userRepo,
     sessions: sessionRepo,
+    verifications: verificationRepo,
     signatures: signatureRepo,
     cards: cardRepo,
     qrCodes: qrRepo,

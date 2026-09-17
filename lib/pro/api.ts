@@ -32,7 +32,7 @@ export async function fetchCurrentUser(): Promise<PublicUser | null> {
 }
 
 export function registerAccount(email: string, password: string) {
-  return apiFetch<{ user: PublicUser }>("/api/auth/register", {
+  return apiFetch<{ user: PublicUser; emailSent: boolean }>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -47,6 +47,20 @@ export function loginAccount(email: string, password: string) {
 
 export function logoutAccount() {
   return apiFetch<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
+}
+
+export function verifyEmailCode(code: string) {
+  return apiFetch<{ user: PublicUser }>("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function resendVerificationEmail() {
+  return apiFetch<{ ok: boolean; emailSent: boolean; alreadyVerified: boolean }>(
+    "/api/auth/resend-verification",
+    { method: "POST" },
+  );
 }
 
 export function fetchDashboardSummary() {

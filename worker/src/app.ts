@@ -2,6 +2,10 @@ import type { Clock } from "./clock";
 import { systemClock } from "./clock";
 import type { Repositories } from "./db/repositories";
 import {
+  createUnconfiguredEmailSender,
+  type EmailSender,
+} from "./email";
+import {
   SESSION_TTL_MS,
   AuthError,
   createAuthService,
@@ -47,6 +51,7 @@ export type AppDeps = {
   repos: Repositories;
   clock?: Clock;
   config: AppConfig;
+  email?: EmailSender;
 };
 
 function corsHeaders(request: Request, config: AppConfig): Record<string, string> {
@@ -128,7 +133,11 @@ function matchPath(pathname: string, pattern: string): Record<string, string> | 
 export function createApp(deps: AppDeps) {
   const clock = deps.clock ?? systemClock;
   const entitlements = createEntitlementService();
-  const auth = createAuthService(deps.repos, clock);
+  const auth = createAuthService(
+    deps.repos,
+    clock,
+    deps.email ?? createUnconfiguredEmailSender(),
+  );
   const signatures = createSignatureService(deps.repos, clock, entitlements);
   const cards = createCardService(
     deps.repos,
@@ -192,7 +201,7 @@ export function createApp(deps: AppDeps) {
         ip,
       });
       return json(
-        { user: result.user },
+        { user: result.user, emailSent: result.emailSent },
         201,
         { "set-cookie": sessionCookie(result.token, cookieOptions(config)) },
       );
@@ -226,29 +235,40 @@ export function createApp(deps: AppDeps) {
       return json({ user });
     }
 
+    if (request.method === "POST" && pathname === "/api/auth/verify-email") {
+      const body = (await readJson(request)) as { code?: unknown };
+      const user = await auth.verifyEmail({ token, code: body.code, ip });
+      return json({ user });
+    }
+
+    if (request.method === "POST" && pathname === "/api/auth/resend-verification") {
+      const result = await auth.resendVerification({ token, ip });
+      return json({ ok: true, ...result });
+    }
+
     if (request.method === "GET" && pathname === "/api/dashboard/summary") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ summary: await dashboard.summary(user.id) });
     }
 
     if (request.method === "GET" && pathname === "/api/account/profile") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ profile: await profiles.get(user.id) });
     }
 
     if (request.method === "PUT" && pathname === "/api/account/profile") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const body = (await readJson(request)) as Record<string, unknown>;
       return json({ profile: await profiles.update(user.id, body) });
     }
 
     if (request.method === "GET" && pathname === "/api/signatures") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ signatures: await signatures.list(user.id) });
     }
 
     if (request.method === "POST" && pathname === "/api/signatures") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const body = (await readJson(request)) as { name?: unknown; data?: unknown };
       const created = await signatures.create(user.id, {
         name: body.name,
@@ -259,14 +279,14 @@ export function createApp(deps: AppDeps) {
 
     const signatureDuplicate = matchPath(pathname, "/api/signatures/:id/duplicate");
     if (signatureDuplicate && request.method === "POST") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const created = await signatures.duplicate(user.id, signatureDuplicate.id);
       return json({ signature: created }, 201);
     }
 
     const signatureOne = matchPath(pathname, "/api/signatures/:id");
     if (signatureOne) {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const { id } = signatureOne;
 
       if (request.method === "GET") {
@@ -285,25 +305,25 @@ export function createApp(deps: AppDeps) {
     }
 
     if (request.method === "GET" && pathname === "/api/cards") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ cards: await cards.list(user.id) });
     }
 
     if (request.method === "POST" && pathname === "/api/cards") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const body = (await readJson(request)) as Record<string, unknown>;
       return json({ card: await cards.create(user.id, body) }, 201);
     }
 
     const cardDuplicate = matchPath(pathname, "/api/cards/:id/duplicate");
     if (cardDuplicate && request.method === "POST") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ card: await cards.duplicate(user.id, cardDuplicate.id) }, 201);
     }
 
     const cardOne = matchPath(pathname, "/api/cards/:id");
     if (cardOne) {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       if (request.method === "GET") {
         return json({ card: await cards.get(user.id, cardOne.id) });
       }
@@ -318,25 +338,25 @@ export function createApp(deps: AppDeps) {
     }
 
     if (request.method === "GET" && pathname === "/api/qr") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ qrCodes: await qrCodes.list(user.id) });
     }
 
     if (request.method === "POST" && pathname === "/api/qr") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const body = (await readJson(request)) as Record<string, unknown>;
       return json({ qrCode: await qrCodes.create(user.id, body) }, 201);
     }
 
     const qrDuplicate = matchPath(pathname, "/api/qr/:id/duplicate");
     if (qrDuplicate && request.method === "POST") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ qrCode: await qrCodes.duplicate(user.id, qrDuplicate.id) }, 201);
     }
 
     const qrOne = matchPath(pathname, "/api/qr/:id");
     if (qrOne) {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       if (request.method === "GET") {
         return json({ qrCode: await qrCodes.get(user.id, qrOne.id) });
       }
@@ -351,21 +371,21 @@ export function createApp(deps: AppDeps) {
     }
 
     if (request.method === "GET" && pathname === "/api/invoices") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({
         invoices: await invoices.list(user.id, url.searchParams.get("q") ?? undefined),
       });
     }
 
     if (request.method === "POST" && pathname === "/api/invoices") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const body = (await readJson(request)) as Record<string, unknown>;
       return json({ invoice: await invoices.create(user.id, body) }, 201);
     }
 
     const invoiceDuplicate = matchPath(pathname, "/api/invoices/:id/duplicate");
     if (invoiceDuplicate && request.method === "POST") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json(
         { invoice: await invoices.duplicate(user.id, invoiceDuplicate.id) },
         201,
@@ -374,7 +394,7 @@ export function createApp(deps: AppDeps) {
 
     const invoiceOne = matchPath(pathname, "/api/invoices/:id");
     if (invoiceOne) {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       if (request.method === "GET") {
         return json({ invoice: await invoices.get(user.id, invoiceOne.id) });
       }
@@ -389,19 +409,19 @@ export function createApp(deps: AppDeps) {
     }
 
     if (request.method === "GET" && pathname === "/api/customers") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       return json({ customers: await customers.list(user.id) });
     }
 
     if (request.method === "POST" && pathname === "/api/customers") {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       const body = (await readJson(request)) as Record<string, unknown>;
       return json({ customer: await customers.create(user.id, body) }, 201);
     }
 
     const customerOne = matchPath(pathname, "/api/customers/:id");
     if (customerOne) {
-      const user = await auth.me(token);
+      const user = await auth.requireVerified(token);
       if (request.method === "GET") {
         return json({ customer: await customers.get(user.id, customerOne.id) });
       }

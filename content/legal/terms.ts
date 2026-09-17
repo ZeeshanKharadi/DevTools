@@ -37,7 +37,7 @@ export const termsOfUse: LegalDocument = {
     {
       heading: "Accounts",
       paragraphs: [
-        "Account registration is optional. If you register, you must provide a valid email address and a password, and you are responsible for keeping that password confidential and for activity on your account.",
+        "If you register, you must provide a valid email address and a password, verify that email with a one-time code, and keep your password confidential. You are responsible for activity on your account.",
         "Saved email signatures belong to the account that created them. You may not attempt to access another person’s account, sessions, or saved signatures. InfyraTools may suspend or remove an account that is used abusively or in violation of these terms.",
         "Signing in uses a first-party session cookie. Signing out ends that session. InfyraTools does not currently provide social login, multi-factor authentication, or a paid identity provider.",
       ],

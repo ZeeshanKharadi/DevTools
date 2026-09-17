@@ -31,9 +31,9 @@ export function RegisterForm() {
     setPending(true);
 
     try {
-      await registerAccount(email, password);
+      const result = await registerAccount(email, password);
       await refresh();
-      router.push("/dashboard");
+      router.push(result.user.emailVerified ? "/dashboard" : "/verify-email");
     } catch (caught) {
       setError(
         caught instanceof ApiError

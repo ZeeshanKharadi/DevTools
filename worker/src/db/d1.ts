@@ -2,6 +2,7 @@ import type {
   BusinessProfileRepository,
   CardRepository,
   CustomerRepository,
+  EmailVerificationRepository,
   InvoiceRepository,
   QrCodeRepository,
   RateLimitStore,
@@ -15,6 +16,7 @@ import type {
   BusinessProfileRecord,
   CustomerRecord,
   DynamicQrRecord,
+  EmailVerificationRecord,
   InvoiceRecord,
   SessionRecord,
   SignatureRecord,
@@ -35,8 +37,19 @@ type UserRow = {
   id: string;
   email: string;
   password_hash: string;
+  email_verified_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type VerificationRow = {
+  id: string;
+  user_id: string;
+  otp_hash: string;
+  expires_at: string;
+  consumed_at: string | null;
+  failed_attempts: number;
+  created_at: string;
 };
 
 type SessionRow = {
@@ -120,8 +133,21 @@ function mapUser(row: UserRow): UserRecord {
     id: row.id,
     email: row.email,
     passwordHash: row.password_hash,
+    emailVerifiedAt: row.email_verified_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapVerification(row: VerificationRow): EmailVerificationRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    otpHash: row.otp_hash,
+    expiresAt: row.expires_at,
+    consumedAt: row.consumed_at,
+    failedAttempts: Number(row.failed_attempts ?? 0),
+    createdAt: row.created_at,
   };
 }
 
@@ -228,7 +254,7 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     async findByEmail(email) {
       const row = await db
         .prepare(
-          "SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = ? LIMIT 1",
+          "SELECT id, email, password_hash, email_verified_at, created_at, updated_at FROM users WHERE email = ? LIMIT 1",
         )
         .bind(email)
         .first<UserRow>();
@@ -237,7 +263,7 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     async findById(id) {
       const row = await db
         .prepare(
-          "SELECT id, email, password_hash, created_at, updated_at FROM users WHERE id = ? LIMIT 1",
+          "SELECT id, email, password_hash, email_verified_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1",
         )
         .bind(id)
         .first<UserRow>();
@@ -247,12 +273,13 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
       try {
         await db
           .prepare(
-            "INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO users (id, email, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
           )
           .bind(
             user.id,
             user.email,
             user.passwordHash,
+            user.emailVerifiedAt,
             user.createdAt,
             user.updatedAt,
           )
@@ -264,6 +291,82 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
         }
         throw error;
       }
+    },
+    async markEmailVerified(userId, verifiedAt) {
+      await db
+        .prepare(
+          "UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ? AND email_verified_at IS NULL",
+        )
+        .bind(verifiedAt, verifiedAt, userId)
+        .run();
+    },
+  };
+
+  const verifications: EmailVerificationRepository = {
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO email_verification_challenges (id, user_id, otp_hash, expires_at, consumed_at, failed_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.otpHash,
+          record.expiresAt,
+          record.consumedAt,
+          record.failedAttempts,
+          record.createdAt,
+        )
+        .run();
+    },
+    async findActiveByUserId(userId, nowIso) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, otp_hash, expires_at, consumed_at, failed_attempts, created_at FROM email_verification_challenges WHERE user_id = ? AND consumed_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(userId, nowIso)
+        .first<VerificationRow>();
+      return row ? mapVerification(row) : null;
+    },
+    async findLatestByUserId(userId) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, otp_hash, expires_at, consumed_at, failed_attempts, created_at FROM email_verification_challenges WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(userId)
+        .first<VerificationRow>();
+      return row ? mapVerification(row) : null;
+    },
+    async consume(id, consumedAt) {
+      await db
+        .prepare(
+          "UPDATE email_verification_challenges SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
+        )
+        .bind(consumedAt, id)
+        .run();
+    },
+    async consumeAllForUser(userId, consumedAt) {
+      await db
+        .prepare(
+          "UPDATE email_verification_challenges SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
+        )
+        .bind(consumedAt, userId)
+        .run();
+    },
+    async incrementFailures(id) {
+      await db
+        .prepare(
+          "UPDATE email_verification_challenges SET failed_attempts = failed_attempts + 1 WHERE id = ?",
+        )
+        .bind(id)
+        .run();
+      const row = await db
+        .prepare(
+          "SELECT failed_attempts FROM email_verification_challenges WHERE id = ? LIMIT 1",
+        )
+        .bind(id)
+        .first<{ failed_attempts: number }>();
+      return Number(row?.failed_attempts ?? 0);
     },
   };
 
@@ -794,6 +897,7 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
   return {
     users,
     sessions,
+    verifications,
     signatures,
     cards,
     qrCodes,

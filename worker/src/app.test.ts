@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import { createMemoryRepositories } from "./db/memory";
+import { RecordingEmailSender } from "./email";
 import { SESSION_COOKIE } from "./http";
 import { addMs } from "./clock";
+import { hashPassword } from "./passwords";
+import { OTP_TTL_MS } from "./otp";
 import { EXAMPLE_INPUT } from "../../lib/tools/email-signature-generator/constants";
+import { RESEND_COOLDOWN_MS } from "./services/auth-service";
 
 const ORIGIN = "http://localhost:3000";
 
@@ -28,9 +32,12 @@ function makeApp(now = new Date("2026-09-14T12:00:00.000Z")) {
     },
   };
 
+  const repos = createMemoryRepositories();
+  const emails = new RecordingEmailSender();
   const app = createApp({
-    repos: createMemoryRepositories(),
+    repos,
     clock,
+    email: emails,
     config: {
       allowedOrigins: [ORIGIN],
       cookieSecure: false,
@@ -39,7 +46,7 @@ function makeApp(now = new Date("2026-09-14T12:00:00.000Z")) {
     },
   });
 
-  return { app, clock };
+  return { app, clock, emails, repos };
 }
 
 async function request(
@@ -76,6 +83,26 @@ async function request(
   );
 }
 
+async function registerAndVerify(
+  app: ReturnType<typeof createApp>,
+  emails: RecordingEmailSender,
+  email: string,
+) {
+  const registered = await request(app, "POST", "/api/auth/register", {
+    body: { email, password },
+  });
+  expect(registered.status).toBe(201);
+  const cookie = cookieFrom(registered);
+  const code = emails.lastVerificationCode();
+  expect(code).toBeTruthy();
+  const verified = await request(app, "POST", "/api/auth/verify-email", {
+    cookie,
+    body: { code },
+  });
+  expect(verified.status).toBe(200);
+  return cookie!;
+}
+
 const password = "correct-horse-battery";
 
 describe("auth API", () => {
@@ -85,8 +112,13 @@ describe("auth API", () => {
       body: { email: "Ada@Example.com", password },
     });
     expect(registered.status).toBe(201);
-    const created = (await registered.json()) as { user: { email: string } };
+    const created = (await registered.json()) as {
+      user: { email: string; emailVerified: boolean };
+      emailSent: boolean;
+    };
     expect(created.user.email).toBe("ada@example.com");
+    expect(created.user.emailVerified).toBe(false);
+    expect(created.emailSent).toBe(true);
     expect(created.user).not.toHaveProperty("passwordHash");
     expect(created.user).not.toHaveProperty("password_hash");
     const token = cookieFrom(registered);
@@ -94,6 +126,11 @@ describe("auth API", () => {
 
     const me = await request(app, "GET", "/api/auth/me", { cookie: token });
     expect(me.status).toBe(200);
+    const meBody = (await me.json()) as { user: { emailVerified: boolean } };
+    expect(meBody.user.emailVerified).toBe(false);
+    expect((await request(app, "GET", "/api/signatures", { cookie: token })).status).toBe(
+      403,
+    );
 
     const loggedOut = await request(app, "POST", "/api/auth/logout", { cookie: token });
     expect(loggedOut.status).toBe(200);
@@ -165,13 +202,171 @@ describe("auth API", () => {
   });
 });
 
+describe("email verification", () => {
+  it("verifies a hashed single-use OTP and then allows dashboard access", async () => {
+    const { app, emails } = makeApp();
+    const registered = await request(app, "POST", "/api/auth/register", {
+      body: { email: "ada@example.com", password },
+    });
+    const cookie = cookieFrom(registered);
+    const sent = emails.last();
+    expect(sent?.text).toContain("Your verification code is:");
+    const code = emails.lastVerificationCode();
+    expect(code).toMatch(/^\d{6}$/);
+    expect(JSON.stringify(sent)).not.toContain("otpHash");
+
+    const wrong = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code: "000000" },
+    });
+    expect(wrong.status).toBe(400);
+    const wrongBody = (await wrong.json()) as { error: { code: string; message: string } };
+
+    const verified = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code },
+    });
+    expect(verified.status).toBe(200);
+    const verifiedBody = (await verified.json()) as { user: { emailVerified: boolean } };
+    expect(verifiedBody.user.emailVerified).toBe(true);
+
+    const reused = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code },
+    });
+    expect(reused.status).toBe(200);
+
+    expect((await request(app, "GET", "/api/signatures", { cookie })).status).toBe(200);
+
+    const missing = await request(app, "POST", "/api/auth/verify-email", {
+      body: { code: "123456" },
+    });
+    expect(missing.status).toBe(401);
+    expect(wrongBody.error.message).toBe("That code is invalid or has expired.");
+  });
+
+  it("rejects an expired OTP with the same message as a wrong OTP", async () => {
+    const { app, clock, emails } = makeApp();
+    const registered = await request(app, "POST", "/api/auth/register", {
+      body: { email: "ada@example.com", password },
+    });
+    const cookie = cookieFrom(registered);
+    const code = emails.lastVerificationCode();
+    clock.set(addMs(clock.now(), OTP_TTL_MS + 1000));
+    const expired = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code },
+    });
+    const wrong = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code: "999999" },
+    });
+    expect(expired.status).toBe(400);
+    expect(wrong.status).toBe(400);
+    const expiredBody = (await expired.json()) as { error: { message: string } };
+    const wrongBody = (await wrong.json()) as { error: { message: string } };
+    expect(expiredBody.error.message).toBe(wrongBody.error.message);
+  });
+
+  it("invalidates the previous OTP when a new code is resent", async () => {
+    const { app, clock, emails } = makeApp();
+    const registered = await request(app, "POST", "/api/auth/register", {
+      body: { email: "ada@example.com", password },
+    });
+    const cookie = cookieFrom(registered);
+    const first = emails.lastVerificationCode();
+    clock.set(addMs(clock.now(), RESEND_COOLDOWN_MS));
+    const resent = await request(app, "POST", "/api/auth/resend-verification", {
+      cookie,
+    });
+    expect(resent.status).toBe(200);
+    const second = emails.lastVerificationCode();
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
+
+    const oldCode = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code: first },
+    });
+    expect(oldCode.status).toBe(400);
+
+    const verified = await request(app, "POST", "/api/auth/verify-email", {
+      cookie,
+      body: { code: second },
+    });
+    expect(verified.status).toBe(200);
+  });
+
+  it("rate-limits verification attempts and does not leak codes to another user", async () => {
+    const { app, emails } = makeApp();
+    const ownerRegistered = await request(app, "POST", "/api/auth/register", {
+      body: { email: "owner@example.com", password },
+      ip: "1.1.1.1",
+    });
+    const ownerCookie = cookieFrom(ownerRegistered);
+    const ownerCode = emails.lastVerificationCode();
+    const otherRegistered = await request(app, "POST", "/api/auth/register", {
+      body: { email: "other@example.com", password },
+      ip: "2.2.2.2",
+    });
+    const otherCookie = cookieFrom(otherRegistered);
+
+    const stolen = await request(app, "POST", "/api/auth/verify-email", {
+      cookie: otherCookie,
+      body: { code: ownerCode },
+      ip: "2.2.2.2",
+    });
+    expect(stolen.status).toBe(400);
+
+    for (let i = 0; i < 8; i += 1) {
+      const attempt = await request(app, "POST", "/api/auth/verify-email", {
+        cookie: ownerCookie,
+        body: { code: "000000" },
+        ip: "1.1.1.1",
+      });
+      expect(attempt.status).toBe(400);
+    }
+    const limited = await request(app, "POST", "/api/auth/verify-email", {
+      cookie: ownerCookie,
+      body: { code: ownerCode },
+      ip: "1.1.1.1",
+    });
+    expect(limited.status).toBe(429);
+  });
+
+  it("lets grandfathered verified users sign in without an OTP", async () => {
+    const { app, repos } = makeApp();
+    const now = "2026-09-14T12:00:00.000Z";
+    await repos.users.create({
+      id: "legacy-user",
+      email: "legacy@example.com",
+      passwordHash: await hashPassword(password),
+      emailVerifiedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const login = await request(app, "POST", "/api/auth/login", {
+      body: { email: "legacy@example.com", password },
+    });
+    expect(login.status).toBe(200);
+    const cookie = cookieFrom(login);
+    const me = (await (await request(app, "GET", "/api/auth/me", { cookie })).json()) as {
+      user: { emailVerified: boolean };
+    };
+    expect(me.user.emailVerified).toBe(true);
+    expect((await request(app, "GET", "/api/signatures", { cookie })).status).toBe(200);
+  });
+});
+
 describe("signature API", () => {
   async function signedIn() {
     const ctx = makeApp();
-    const registered = await request(ctx.app, "POST", "/api/auth/register", {
-      body: { email: "owner@example.com", password },
-    });
-    return { ...ctx, cookie: cookieFrom(registered)! };
+    const cookie = await registerAndVerify(
+      ctx.app,
+      ctx.emails,
+      "owner@example.com",
+    );
+    return { ...ctx, cookie };
   }
 
   it("creates, lists, edits, duplicates, and deletes a signature", async () => {
@@ -224,21 +419,15 @@ describe("signature API", () => {
   });
 
   it("rejects unauthenticated writes and cross-user reads", async () => {
-    const { app } = makeApp();
-    const owner = await request(app, "POST", "/api/auth/register", {
-      body: { email: "owner@example.com", password },
-    });
-    const ownerCookie = cookieFrom(owner);
+    const { app, emails } = makeApp();
+    const ownerCookie = await registerAndVerify(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/signatures", {
       cookie: ownerCookie,
       body: { name: "Private", data: EXAMPLE_INPUT },
     });
     const id = ((await created.json()) as { signature: { id: string } }).signature.id;
 
-    const other = await request(app, "POST", "/api/auth/register", {
-      body: { email: "intruder@example.com", password },
-    });
-    const otherCookie = cookieFrom(other);
+    const otherCookie = await registerAndVerify(app, emails, "intruder@example.com");
 
     expect((await request(app, "GET", `/api/signatures/${id}`)).status).toBe(401);
     expect(

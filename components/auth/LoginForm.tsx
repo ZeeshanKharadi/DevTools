@@ -24,9 +24,9 @@ export function LoginForm() {
     setPending(true);
 
     try {
-      await loginAccount(email, password);
+      const result = await loginAccount(email, password);
       await refresh();
-      router.push("/dashboard");
+      router.push(result.user.emailVerified ? "/dashboard" : "/verify-email");
     } catch (caught) {
       setError(
         caught instanceof ApiError

@@ -65,7 +65,10 @@ No production secrets are required for sessions: the cookie holds an opaque rand
 
 ## Authentication and sessions
 
-- Register / login / logout / `GET /api/auth/me`
+- Register / login / logout / `GET /api/auth/me` / `POST /api/auth/verify-email` / `POST /api/auth/resend-verification`
+- New registrations create an unverified session and must submit a 6-digit email OTP before Pro APIs or the dashboard. Existing users are grandfathered as verified by migration `0003_email_verification.sql` (`email_verified_at = created_at`).
+- OTPs are stored as `hmac-sha256$1$<salt>$<mac>` (random 16-byte salt, HMAC-SHA256). They expire in 10 minutes, are single-use, and are invalidated after 5 failed attempts. Verify: 8 / 15 minutes / user and 20 / 15 minutes / IP. Resend: 3 / 15 minutes / user, 8 / hour / IP, plus a 60-second cooldown. Failed verification uses the same message for wrong, expired, or missing codes. Verify and resend require a session so unauthenticated callers cannot probe emails.
+- Email sending is behind `EmailSender`. Local `EMAIL_PROVIDER=console` logs messages. Production should use `RESEND_API_KEY` as a Wrangler secret (never committed). Do not deploy verification to production until that secret and a verified sending domain are in place.
 - Passwords hashed with **Web Crypto PBKDF2-HMAC-SHA256** (100,000 iterations, unique random salt). Cloudflare production Web Crypto and `node:crypto` reject PBKDF2 above 100,000 iterations (`NotSupportedError`). The stored string is `pbkdf2-hmac-sha256$1$<iterations>$<salt>$<hash>`. Verification uses the work factor stored with that hash. Hashes are never returned in API responses. This still requires Workers Paid (Free is 10 ms CPU).
 - Session cookie `infyratools_session`: **HttpOnly**, **SameSite=Lax** (production), **Secure** in production, 14-day expiry.
 - Session lookups require `expires_at > now` in the database query. The service layer also rejects expired sessions on every authenticated request. Expired rows for that identifier may be deleted when encountered. There is no scheduled session cleanup in this phase.
@@ -73,6 +76,7 @@ No production secrets are required for sessions: the cookie holds an opaque rand
 - Mutating requests with an `Origin` header must match `APP_ORIGIN`. JSON `Content-Type` is required (CSRF reduction with Lax cookies).
 - Login: 10 attempts / 15 minutes / IP. Register: 5 / hour / IP.
 - Login failures use the same message whether or not the email exists.
+- `GET /api/auth/me` works for unverified sessions. All other `/api/*` product routes require `email_verified_at`.
 
 ## D1 foreign keys
 
@@ -80,6 +84,7 @@ Cloudflare D1 **enforces foreign keys by default**. The migration declares them 
 
 - `sessions.user_id` → `users.id` **ON DELETE CASCADE**
 - `email_signatures.user_id` → `users.id` **ON DELETE CASCADE**
+- `email_verification_challenges.user_id` → `users.id` **ON DELETE CASCADE**
 
 That matches the intended account-deletion model: removing a user removes that user’s sessions and saved signatures. Application-layer ownership checks still run on every signature read/write. Foreign keys are not authorization.
 
@@ -92,14 +97,17 @@ That matches the intended account-deletion model: removing a user removes that u
 
 | Binding / var | Purpose |
 |---|---|
-| `DB` (D1) | users, sessions, email_signatures, auth_attempts, plus Pro MVP tables in `0002_pro_mvp.sql` |
+| `DB` (D1) | users, sessions, email_signatures, auth_attempts, verification challenges, plus Pro MVP tables in `0002_pro_mvp.sql` |
 | `APP_ORIGIN` | Allowed CORS / Origin list (comma-separated if needed) |
 | `PUBLIC_BASE_URL` | Origin used in hosted card and dynamic QR public URLs |
 | `COOKIE_SECURE` | `true` in production |
 | `COOKIE_SAMESITE` | `lax` in production; `none` only if API is on another site |
+| `EMAIL_PROVIDER` | Local only: `console`. Omit in production. |
+| `EMAIL_FROM` | From address for transactional email |
+| `RESEND_API_KEY` | Wrangler secret for the Resend provider. Never commit. |
 
 Never commit `worker/.dev.vars`, `.env.local`, or D1 dumps with user data.
 
 ## Dashboard protection
 
-`/dashboard` is statically exported like the rest of the site. It redirects to `/login` in the browser when there is no session. Saved signature data is never embedded in that HTML; it is loaded from authenticated APIs that enforce ownership.
+`/dashboard` is statically exported like the rest of the site. It redirects to `/login` in the browser when there is no session, and to `/verify-email` when the session is unverified. Saved signature data is never embedded in that HTML; it is loaded from authenticated APIs that enforce ownership.

@@ -2,6 +2,7 @@ export type UserRecord = {
   id: string;
   email: string;
   passwordHash: string;
+  emailVerifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -9,6 +10,17 @@ export type UserRecord = {
 export type PublicUser = {
   id: string;
   email: string;
+  emailVerified: boolean;
+  createdAt: string;
+};
+
+export type EmailVerificationRecord = {
+  id: string;
+  userId: string;
+  otpHash: string;
+  expiresAt: string;
+  consumedAt: string | null;
+  failedAttempts: number;
   createdAt: string;
 };
 
@@ -92,6 +104,7 @@ export function toPublicUser(user: UserRecord): PublicUser {
   return {
     id: user.id,
     email: user.email,
+    emailVerified: Boolean(user.emailVerifiedAt),
     createdAt: user.createdAt,
   };
 }

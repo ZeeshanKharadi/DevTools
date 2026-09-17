@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import { createMemoryRepositories } from "./db/memory";
+import { RecordingEmailSender } from "./email";
 import { SESSION_COOKIE } from "./http";
 import { EXAMPLE_INPUT as CARD_EXAMPLE } from "../../lib/tools/digital-business-card/constants";
 import { EXAMPLE_INPUT as INVOICE_EXAMPLE } from "../../lib/tools/invoice-generator/constants";
@@ -19,8 +20,10 @@ function cookieFrom(response: Response): string | null {
 }
 
 function makeApp() {
+  const emails = new RecordingEmailSender();
   const app = createApp({
     repos: createMemoryRepositories(),
+    email: emails,
     config: {
       allowedOrigins: [ORIGIN],
       cookieSecure: false,
@@ -28,7 +31,7 @@ function makeApp() {
       publicBaseUrl: "https://infyratools.com",
     },
   });
-  return { app };
+  return { app, emails };
 }
 
 async function request(
@@ -63,18 +66,25 @@ async function request(
 
 async function register(
   app: ReturnType<typeof createApp>,
+  emails: RecordingEmailSender,
   email: string,
 ) {
   const response = await request(app, "POST", "/api/auth/register", {
     body: { email, password },
   });
-  return cookieFrom(response)!;
+  const cookie = cookieFrom(response)!;
+  const code = emails.lastVerificationCode();
+  await request(app, "POST", "/api/auth/verify-email", {
+    cookie,
+    body: { code },
+  });
+  return cookie;
 }
 
 describe("business cards API", () => {
   it("creates, lists, edits, duplicates, and deletes a card", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/cards", {
       cookie,
       body: { name: "Work Card", slug: "jane-rivera", data: CARD_EXAMPLE },
@@ -119,9 +129,9 @@ describe("business cards API", () => {
   });
 
   it("rejects a duplicate public slug", async () => {
-    const { app } = makeApp();
-    const owner = await register(app, "owner@example.com");
-    const other = await register(app, "other@example.com");
+    const { app, emails } = makeApp();
+    const owner = await register(app, emails, "owner@example.com");
+    const other = await register(app, emails, "other@example.com");
     expect(
       (
         await request(app, "POST", "/api/cards", {
@@ -141,8 +151,8 @@ describe("business cards API", () => {
   });
 
   it("serves an active public card and hides an inactive one", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/cards", {
       cookie,
       body: {
@@ -184,14 +194,14 @@ describe("business cards API", () => {
   });
 
   it("rejects unauthenticated writes and cross-user management", async () => {
-    const { app } = makeApp();
-    const owner = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const owner = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/cards", {
       cookie: owner,
       body: { name: "Private", data: CARD_EXAMPLE },
     });
     const id = ((await created.json()) as { card: { id: string } }).card.id;
-    const other = await register(app, "intruder@example.com");
+    const other = await register(app, emails, "intruder@example.com");
 
     expect((await request(app, "GET", `/api/cards/${id}`)).status).toBe(401);
     expect((await request(app, "GET", `/api/cards/${id}`, { cookie: other })).status).toBe(
@@ -217,8 +227,8 @@ describe("business cards API", () => {
 
 describe("dynamic QR API", () => {
   it("creates a code, updates the destination without changing the code, and redirects", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/qr", {
       cookie,
       body: { name: "Site QR", destinationUrl: "https://example.com/start" },
@@ -252,8 +262,8 @@ describe("dynamic QR API", () => {
   });
 
   it("does not redirect inactive or missing codes and rejects unsafe destinations", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     expect(
       (
         await request(app, "POST", "/api/qr", {
@@ -298,14 +308,14 @@ describe("dynamic QR API", () => {
   });
 
   it("rejects cross-user management", async () => {
-    const { app } = makeApp();
-    const owner = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const owner = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/qr", {
       cookie: owner,
       body: { name: "Private", destinationUrl: "https://example.com" },
     });
     const id = ((await created.json()) as { qrCode: { id: string } }).qrCode.id;
-    const other = await register(app, "intruder@example.com");
+    const other = await register(app, emails, "intruder@example.com");
     expect((await request(app, "GET", `/api/qr/${id}`, { cookie: other })).status).toBe(404);
     expect(
       (
@@ -327,8 +337,8 @@ describe("dynamic QR API", () => {
 
 describe("invoices and customers API", () => {
   it("creates, searches, duplicates, changes status, and deletes invoices", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/invoices", {
       cookie,
       body: { data: INVOICE_EXAMPLE },
@@ -364,14 +374,14 @@ describe("invoices and customers API", () => {
   });
 
   it("rejects cross-user invoice access", async () => {
-    const { app } = makeApp();
-    const owner = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const owner = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/invoices", {
       cookie: owner,
       body: { data: INVOICE_EXAMPLE },
     });
     const id = ((await created.json()) as { invoice: { id: string } }).invoice.id;
-    const other = await register(app, "intruder@example.com");
+    const other = await register(app, emails, "intruder@example.com");
     expect((await request(app, "GET", `/api/invoices/${id}`, { cookie: other })).status).toBe(
       404,
     );
@@ -396,8 +406,8 @@ describe("invoices and customers API", () => {
   });
 
   it("creates, updates, and deletes owned customers only", async () => {
-    const { app } = makeApp();
-    const owner = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const owner = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/customers", {
       cookie: owner,
       body: {
@@ -417,7 +427,7 @@ describe("invoices and customers API", () => {
       ).status,
     ).toBe(200);
 
-    const other = await register(app, "intruder@example.com");
+    const other = await register(app, emails, "intruder@example.com");
     expect(
       (await request(app, "GET", `/api/customers/${id}`, { cookie: other })).status,
     ).toBe(404);
@@ -444,8 +454,8 @@ describe("invoices and customers API", () => {
 
 describe("dashboard summary and business profile", () => {
   it("returns real counts and stores an optional profile", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     await request(app, "POST", "/api/cards", {
       cookie,
       body: { name: "Card", data: CARD_EXAMPLE },
@@ -488,7 +498,7 @@ describe("dashboard summary and business profile", () => {
     expect(profile.profile.businessName).toBe("Northwind Labs");
     expect(profile.profile.logoUrl).toBe("");
 
-    const other = await register(app, "intruder@example.com");
+    const other = await register(app, emails, "intruder@example.com");
     const otherProfile = (await (
       await request(app, "GET", "/api/account/profile", { cookie: other })
     ).json()) as { profile: { businessName: string } };
@@ -506,8 +516,8 @@ describe("dashboard summary and business profile", () => {
 
 describe("hardening: validation and independence", () => {
   it("duplicates a QR with a new code and zero scans", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/qr", {
       cookie,
       body: { name: "Original", destinationUrl: "https://example.com/a" },
@@ -531,8 +541,8 @@ describe("hardening: validation and independence", () => {
   });
 
   it("duplicates a card with a new slug", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/cards", {
       cookie,
       body: { name: "Original", slug: "owned-card", data: CARD_EXAMPLE },
@@ -549,8 +559,8 @@ describe("hardening: validation and independence", () => {
   });
 
   it("rejects non-boolean isActive flags and invalid invoice statuses", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     expect(
       (
         await request(app, "POST", "/api/qr", {
@@ -584,8 +594,8 @@ describe("hardening: validation and independence", () => {
   });
 
   it("rejects malformed JSON and control characters in destinations", async () => {
-    const { app } = makeApp();
-    const cookie = await register(app, "owner@example.com");
+    const { app, emails } = makeApp();
+    const cookie = await register(app, emails, "owner@example.com");
     const malformed = await app.fetch(
       new Request("https://infyratools.com/api/cards", {
         method: "POST",
@@ -615,8 +625,10 @@ describe("hardening: validation and independence", () => {
     repos.qrCodes.recordScan = async () => {
       throw new Error("scan_failed");
     };
+    const emails = new RecordingEmailSender();
     const app = createApp({
       repos,
+      email: emails,
       config: {
         allowedOrigins: [ORIGIN],
         cookieSecure: false,
@@ -624,7 +636,7 @@ describe("hardening: validation and independence", () => {
         publicBaseUrl: "https://infyratools.com",
       },
     });
-    const cookie = await register(app, "owner@example.com");
+    const cookie = await register(app, emails, "owner@example.com");
     const created = await request(app, "POST", "/api/qr", {
       cookie,
       body: { name: "Live", destinationUrl: "https://example.com/ok" },

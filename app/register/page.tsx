@@ -23,8 +23,9 @@ export default function RegisterPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Create an account</h1>
           <p className="text-sm text-muted">
             InfyraTools Pro Beta — Complimentary access to all Pro features
-            during beta. No payment method required. Free tools still work
-            without registering.
+            during beta. No payment method required. We’ll email a 6-digit
+            code to verify new accounts. Free tools still work without
+            registering.
           </p>
         </header>
         <RegisterForm />

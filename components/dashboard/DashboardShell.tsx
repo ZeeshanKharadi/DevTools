@@ -33,10 +33,12 @@ export function RequireAuth({
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
+    } else if (!loading && user && !user.emailVerified) {
+      router.replace("/verify-email");
     }
   }, [loading, user, router]);
 
-  if (loading || !user) {
+  if (loading || !user || !user.emailVerified) {
     return <p className="text-sm text-muted">Loading {label}…</p>;
   }
 

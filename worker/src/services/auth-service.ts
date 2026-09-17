@@ -2,7 +2,21 @@ import type { Clock } from "../clock";
 import { addMs, toIso } from "../clock";
 import type { Repositories } from "../db/repositories";
 import { toPublicUser, type PublicUser, type SessionRecord } from "../db/types";
+import {
+  EmailDeliveryError,
+  type EmailSender,
+  verificationEmail,
+} from "../email";
 import { createId, normalizeEmail, validatePassword } from "../ids";
+import {
+  dummyOtpCompare,
+  generateOtp,
+  hashOtp,
+  normalizeOtp,
+  OTP_MAX_FAILED_ATTEMPTS,
+  OTP_TTL_MS,
+  verifyOtp,
+} from "../otp";
 import { hashPassword, verifyPassword } from "../passwords";
 import { createSessionToken, hashToken } from "../session-token";
 
@@ -11,6 +25,16 @@ export const LOGIN_LIMIT = 10;
 export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export const REGISTER_LIMIT = 5;
 export const REGISTER_WINDOW_MS = 60 * 60 * 1000;
+export const VERIFY_LIMIT = 8;
+export const VERIFY_WINDOW_MS = 15 * 60 * 1000;
+export const VERIFY_IP_LIMIT = 20;
+export const RESEND_LIMIT = 3;
+export const RESEND_WINDOW_MS = 15 * 60 * 1000;
+export const RESEND_IP_LIMIT = 8;
+export const RESEND_IP_WINDOW_MS = 60 * 60 * 1000;
+export const RESEND_COOLDOWN_MS = 60 * 1000;
+
+const INVALID_CODE_MESSAGE = "That code is invalid or has expired.";
 
 export class AuthError extends Error {
   constructor(
@@ -28,7 +52,7 @@ export type AuthService = {
     email: string;
     password: string;
     ip: string;
-  }): Promise<{ user: PublicUser; token: string }>;
+  }): Promise<{ user: PublicUser; token: string; emailSent: boolean }>;
   login(input: {
     email: string;
     password: string;
@@ -36,11 +60,22 @@ export type AuthService = {
   }): Promise<{ user: PublicUser; token: string }>;
   logout(token: string | null): Promise<void>;
   me(token: string | null): Promise<PublicUser>;
+  requireVerified(token: string | null): Promise<PublicUser>;
+  verifyEmail(input: {
+    token: string | null;
+    code: unknown;
+    ip: string;
+  }): Promise<PublicUser>;
+  resendVerification(input: {
+    token: string | null;
+    ip: string;
+  }): Promise<{ emailSent: boolean; alreadyVerified: boolean }>;
 };
 
 export function createAuthService(
   repos: Repositories,
   clock: Clock,
+  email: EmailSender,
 ): AuthService {
   async function createSession(userId: string): Promise<string> {
     const now = clock.now();
@@ -90,6 +125,57 @@ export function createAuthService(
     return { user, session };
   }
 
+  async function sendVerification(userId: string, address: string): Promise<boolean> {
+    const now = clock.now();
+    const nowIso = toIso(now);
+    const otp = generateOtp();
+    await repos.verifications.consumeAllForUser(userId, nowIso);
+    await repos.verifications.create({
+      id: createId(),
+      userId,
+      otpHash: await hashOtp(otp),
+      expiresAt: toIso(addMs(now, OTP_TTL_MS)),
+      consumedAt: null,
+      failedAttempts: 0,
+      createdAt: nowIso,
+    });
+
+    try {
+      await email.send(verificationEmail(address, otp));
+      return true;
+    } catch (error) {
+      if (error instanceof EmailDeliveryError) {
+        console.error("email_delivery_failed", error.message);
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async function enforceLimit(
+    action: string,
+    key: string,
+    limit: number,
+    windowMs: number,
+    message: string,
+  ) {
+    const hits = await repos.rateLimits.hit(
+      action,
+      key || "unknown",
+      toIso(clock.now()),
+      windowMs,
+    );
+    if (hits > limit) {
+      throw new AuthError(429, "rate_limited", message);
+    }
+  }
+
+  const unverifiedError = new AuthError(
+    403,
+    "email_unverified",
+    "Verify your email to continue.",
+  );
+
   return {
     async register({ email, password, ip }) {
       const normalized = normalizeEmail(email);
@@ -102,19 +188,13 @@ export function createAuthService(
         throw new AuthError(400, "invalid_password", passwordError);
       }
 
-      const hits = await repos.rateLimits.hit(
+      await enforceLimit(
         "register",
         ip || "unknown",
-        toIso(clock.now()),
+        REGISTER_LIMIT,
         REGISTER_WINDOW_MS,
+        "Too many registration attempts. Try again later.",
       );
-      if (hits > REGISTER_LIMIT) {
-        throw new AuthError(
-          429,
-          "rate_limited",
-          "Too many registration attempts. Try again later.",
-        );
-      }
 
       const now = toIso(clock.now());
       try {
@@ -122,6 +202,7 @@ export function createAuthService(
           id: createId(),
           email: normalized,
           passwordHash: await hashPassword(password),
+          emailVerifiedAt: null,
           createdAt: now,
           updatedAt: now,
         });
@@ -141,24 +222,19 @@ export function createAuthService(
         throw new AuthError(500, "server_error", "Could not create the account.");
       }
 
+      const emailSent = await sendVerification(user.id, user.email);
       const token = await createSession(user.id);
-      return { user: toPublicUser(user), token };
+      return { user: toPublicUser(user), token, emailSent };
     },
 
     async login({ email, password, ip }) {
-      const hits = await repos.rateLimits.hit(
+      await enforceLimit(
         "login",
         ip || "unknown",
-        toIso(clock.now()),
+        LOGIN_LIMIT,
         LOGIN_WINDOW_MS,
+        "Too many sign-in attempts. Try again later.",
       );
-      if (hits > LOGIN_LIMIT) {
-        throw new AuthError(
-          429,
-          "rate_limited",
-          "Too many sign-in attempts. Try again later.",
-        );
-      }
 
       const invalid = new AuthError(
         401,
@@ -197,6 +273,109 @@ export function createAuthService(
     async me(token) {
       const { user } = await readSession(token);
       return toPublicUser(user);
+    },
+
+    async requireVerified(token) {
+      const { user } = await readSession(token);
+      if (!user.emailVerifiedAt) {
+        throw unverifiedError;
+      }
+      return toPublicUser(user);
+    },
+
+    async verifyEmail({ token, code, ip }) {
+      const { user } = await readSession(token);
+
+      await enforceLimit(
+        "verify_email",
+        user.id,
+        VERIFY_LIMIT,
+        VERIFY_WINDOW_MS,
+        "Too many verification attempts. Try again later.",
+      );
+      await enforceLimit(
+        "verify_email_ip",
+        ip || "unknown",
+        VERIFY_IP_LIMIT,
+        VERIFY_WINDOW_MS,
+        "Too many verification attempts. Try again later.",
+      );
+
+      if (user.emailVerifiedAt) {
+        return toPublicUser(user);
+      }
+
+      const now = clock.now();
+      const nowIso = toIso(now);
+      const otp = normalizeOtp(code);
+      const challenge = await repos.verifications.findActiveByUserId(user.id, nowIso);
+
+      if (!otp || !challenge) {
+        await dummyOtpCompare(otp ?? "000000");
+        throw new AuthError(400, "invalid_code", INVALID_CODE_MESSAGE);
+      }
+
+      const matches = await verifyOtp(otp, challenge.otpHash);
+      if (!matches) {
+        const failures = await repos.verifications.incrementFailures(challenge.id);
+        if (failures >= OTP_MAX_FAILED_ATTEMPTS) {
+          await repos.verifications.consume(challenge.id, nowIso);
+        }
+        throw new AuthError(400, "invalid_code", INVALID_CODE_MESSAGE);
+      }
+
+      await repos.verifications.consume(challenge.id, nowIso);
+      await repos.users.markEmailVerified(user.id, nowIso);
+      const verified = await repos.users.findById(user.id);
+      if (!verified) {
+        throw new AuthError(500, "server_error", "Could not verify the account.");
+      }
+      return toPublicUser(verified);
+    },
+
+    async resendVerification({ token, ip }) {
+      const { user } = await readSession(token);
+
+      await enforceLimit(
+        "resend_otp",
+        user.id,
+        RESEND_LIMIT,
+        RESEND_WINDOW_MS,
+        "Too many resend attempts. Try again later.",
+      );
+      await enforceLimit(
+        "resend_otp_ip",
+        ip || "unknown",
+        RESEND_IP_LIMIT,
+        RESEND_IP_WINDOW_MS,
+        "Too many resend attempts. Try again later.",
+      );
+
+      if (user.emailVerifiedAt) {
+        return { emailSent: false, alreadyVerified: true };
+      }
+
+      const latest = await repos.verifications.findLatestByUserId(user.id);
+      if (latest) {
+        const elapsed = clock.now().getTime() - new Date(latest.createdAt).getTime();
+        if (elapsed < RESEND_COOLDOWN_MS) {
+          throw new AuthError(
+            429,
+            "rate_limited",
+            "Wait a moment before requesting another code.",
+          );
+        }
+      }
+
+      const emailSent = await sendVerification(user.id, user.email);
+      if (!emailSent) {
+        throw new AuthError(
+          503,
+          "email_unavailable",
+          "We could not send the verification email. Try again in a moment.",
+        );
+      }
+      return { emailSent: true, alreadyVerified: false };
     },
   };
 }

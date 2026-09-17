@@ -34,10 +34,10 @@ export function AuthNav() {
   return (
     <div className="flex items-center gap-3 text-sm">
       <Link
-        href="/dashboard"
+        href={user.emailVerified ? "/dashboard" : "/verify-email"}
         className="text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
       >
-        Dashboard
+        {user.emailVerified ? "Dashboard" : "Verify email"}
       </Link>
       <button
         type="button"

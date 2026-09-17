@@ -1,5 +1,6 @@
 import { createApp, type AppConfig } from "./app";
 import { createD1Repositories } from "./db/d1";
+import { createEmailSenderFromEnv } from "./email";
 
 export type WorkerEnv = {
   DB: {
@@ -15,6 +16,9 @@ export type WorkerEnv = {
   PUBLIC_BASE_URL?: string;
   COOKIE_SECURE?: string;
   COOKIE_SAMESITE?: string;
+  EMAIL_PROVIDER?: string;
+  EMAIL_FROM?: string;
+  RESEND_API_KEY?: string;
 };
 
 function configFromEnv(env: WorkerEnv): AppConfig {
@@ -37,6 +41,7 @@ const worker = {
     const app = createApp({
       repos: createD1Repositories(env.DB),
       config: configFromEnv(env),
+      email: createEmailSenderFromEnv(env),
     });
     return app.fetch(request);
   },
