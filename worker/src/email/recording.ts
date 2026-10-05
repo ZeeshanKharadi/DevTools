@@ -1,4 +1,4 @@
-import { parseVerificationCode } from "./templates";
+import { parsePasswordResetUrl, parseVerificationCode } from "./templates";
 import type { EmailMessage, EmailSender } from "./types";
 
 export class RecordingEmailSender implements EmailSender {
@@ -15,5 +15,15 @@ export class RecordingEmailSender implements EmailSender {
   lastVerificationCode(): string | null {
     const last = this.last();
     return last ? parseVerificationCode(last.text) : null;
+  }
+
+  lastPasswordResetUrl(): string | null {
+    for (let i = this.messages.length - 1; i >= 0; i -= 1) {
+      const url = parsePasswordResetUrl(this.messages[i].text);
+      if (url) {
+        return url;
+      }
+    }
+    return null;
   }
 }

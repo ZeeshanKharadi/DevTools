@@ -20,7 +20,12 @@ import { createInvoiceService } from "./services/invoice-service";
 import { createCustomerService } from "./services/customer-service";
 import { createProfileService } from "./services/profile-service";
 import { createDashboardService } from "./services/dashboard-service";
+import { createBillingService } from "./services/billing-service";
 import { createEntitlementService } from "./services/entitlement";
+import {
+  createUnconfiguredStripeClient,
+  type StripeClient,
+} from "./stripe/client";
 import {
   cardUnavailableResponse,
   publicCardResponse,
@@ -45,6 +50,10 @@ export type AppConfig = {
   cookieSecure: boolean;
   cookieSameSite: "Lax" | "None";
   publicBaseUrl: string;
+  /** Temporary complimentary Pro access. Set false when Stripe is live. */
+  proBetaAccess: boolean;
+  stripePriceId: string;
+  stripeWebhookSecret: string;
 };
 
 export type AppDeps = {
@@ -52,6 +61,7 @@ export type AppDeps = {
   clock?: Clock;
   config: AppConfig;
   email?: EmailSender;
+  stripe?: StripeClient;
 };
 
 function corsHeaders(request: Request, config: AppConfig): Record<string, string> {
@@ -132,11 +142,26 @@ function matchPath(pathname: string, pattern: string): Record<string, string> | 
 
 export function createApp(deps: AppDeps) {
   const clock = deps.clock ?? systemClock;
-  const entitlements = createEntitlementService();
+  const entitlements = createEntitlementService({
+    betaAccess: deps.config.proBetaAccess,
+    repos: deps.repos,
+    clock,
+  });
   const auth = createAuthService(
     deps.repos,
     clock,
     deps.email ?? createUnconfiguredEmailSender(),
+    deps.config.publicBaseUrl,
+  );
+  const billing = createBillingService(
+    deps.repos,
+    clock,
+    deps.stripe ?? createUnconfiguredStripeClient(),
+    {
+      priceId: deps.config.stripePriceId,
+      webhookSecret: deps.config.stripeWebhookSecret,
+      publicBaseUrl: deps.config.publicBaseUrl,
+    },
   );
   const signatures = createSignatureService(deps.repos, clock, entitlements);
   const cards = createCardService(
@@ -161,6 +186,16 @@ export function createApp(deps: AppDeps) {
     const { pathname } = url;
     const token = readCookie(request, SESSION_COOKIE);
     const ip = clientIp(request);
+
+    if (
+      request.method === "POST" &&
+      pathname === "/api/webhooks/stripe"
+    ) {
+      const payload = await request.text();
+      const signature = request.headers.get("stripe-signature");
+      const result = await billing.handleWebhook(payload, signature);
+      return json(result);
+    }
 
     if (pathname.startsWith("/card/") && request.method === "GET") {
       const publicCard = matchPath(pathname, "/card/:slug");
@@ -244,6 +279,39 @@ export function createApp(deps: AppDeps) {
     if (request.method === "POST" && pathname === "/api/auth/resend-verification") {
       const result = await auth.resendVerification({ token, ip });
       return json({ ok: true, ...result });
+    }
+
+    if (request.method === "POST" && pathname === "/api/auth/forgot-password") {
+      const body = (await readJson(request)) as { email?: string };
+      const result = await auth.requestPasswordReset({
+        email: String(body.email ?? ""),
+        ip,
+      });
+      return json(result);
+    }
+
+    if (request.method === "POST" && pathname === "/api/auth/reset-password") {
+      const body = (await readJson(request)) as {
+        token?: unknown;
+        password?: string;
+      };
+      const result = await auth.resetPassword({
+        token: body.token,
+        password: String(body.password ?? ""),
+        ip,
+      });
+      return json(result);
+    }
+
+    if (request.method === "POST" && pathname === "/api/billing/create-checkout-session") {
+      const user = await auth.requireVerified(token);
+      const result = await billing.createCheckoutSession(user.id, user.email);
+      return json(result);
+    }
+
+    if (request.method === "GET" && pathname === "/api/billing/subscription") {
+      const user = await auth.requireVerified(token);
+      return json(await billing.getSubscription(user.id));
     }
 
     if (request.method === "GET" && pathname === "/api/dashboard/summary") {

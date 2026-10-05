@@ -5,16 +5,42 @@ import type {
   DynamicQrRecord,
   EmailVerificationRecord,
   InvoiceRecord,
+  PasswordResetRecord,
+  ProcessedStripeEventRecord,
   SessionRecord,
   SignatureRecord,
+  SubscriptionRecord,
   UserRecord,
 } from "./types";
 
 export interface UserRepository {
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
+  findByStripeCustomerId(stripeCustomerId: string): Promise<UserRecord | null>;
   create(user: UserRecord): Promise<void>;
   markEmailVerified(userId: string, verifiedAt: string): Promise<void>;
+  updatePassword(
+    userId: string,
+    passwordHash: string,
+    updatedAt: string,
+  ): Promise<void>;
+  setStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void>;
+}
+
+export interface SubscriptionRepository {
+  findByUserId(userId: string): Promise<SubscriptionRecord | null>;
+  findByStripeSubscriptionId(
+    stripeSubscriptionId: string,
+  ): Promise<SubscriptionRecord | null>;
+  findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<SubscriptionRecord | null>;
+  upsert(record: SubscriptionRecord): Promise<void>;
+}
+
+export interface ProcessedStripeEventRepository {
+  has(eventId: string): Promise<boolean>;
+  record(record: ProcessedStripeEventRecord): Promise<boolean>;
 }
 
 export interface EmailVerificationRepository {
@@ -29,10 +55,21 @@ export interface EmailVerificationRepository {
   incrementFailures(id: string): Promise<number>;
 }
 
+export interface PasswordResetRepository {
+  create(record: PasswordResetRecord): Promise<void>;
+  findActiveByTokenHash(
+    tokenHash: string,
+    nowIso: string,
+  ): Promise<PasswordResetRecord | null>;
+  consume(id: string, consumedAt: string): Promise<void>;
+  consumeAllForUser(userId: string, consumedAt: string): Promise<void>;
+}
+
 export interface SessionRepository {
   create(session: SessionRecord): Promise<void>;
   findById(id: string, nowIso: string): Promise<SessionRecord | null>;
   delete(id: string): Promise<void>;
+  deleteByUserId(userId: string): Promise<void>;
   deleteIfExpired(id: string, nowIso: string): Promise<void>;
   deleteExpired(nowIso: string): Promise<void>;
   touch(id: string, lastUsedAt: string): Promise<void>;
@@ -98,6 +135,9 @@ export type Repositories = {
   users: UserRepository;
   sessions: SessionRepository;
   verifications: EmailVerificationRepository;
+  passwordResets: PasswordResetRepository;
+  subscriptions: SubscriptionRepository;
+  processedStripeEvents: ProcessedStripeEventRepository;
   signatures: SignatureRepository;
   cards: CardRepository;
   qrCodes: QrCodeRepository;

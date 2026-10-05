@@ -29,6 +29,9 @@ function makeApp() {
       cookieSecure: false,
       cookieSameSite: "Lax",
       publicBaseUrl: "https://infyratools.com",
+      proBetaAccess: true,
+      stripePriceId: "",
+      stripeWebhookSecret: "",
     },
   });
   return { app, emails };
@@ -634,6 +637,9 @@ describe("hardening: validation and independence", () => {
         cookieSecure: false,
         cookieSameSite: "Lax",
         publicBaseUrl: "https://infyratools.com",
+        proBetaAccess: true,
+        stripePriceId: "",
+        stripeWebhookSecret: "",
       },
     });
     const cookie = await register(app, emails, "owner@example.com");

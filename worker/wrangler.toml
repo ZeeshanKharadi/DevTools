@@ -37,4 +37,7 @@ zone_name = "infyratools.com"
 # Local D1 still uses --local and does not touch this remote database.
 # Email: set EMAIL_PROVIDER=console in .dev.vars for local OTP logs.
 # Production uses RESEND_API_KEY (Wrangler secret, never this file) and EMAIL_FROM.
+# Stripe: set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET as Wrangler secrets.
+# STRIPE_PRICE_ID may be a plain var or secret. Never commit secret keys.
+# Set PRO_BETA_ACCESS=false when Stripe subscriptions should be the only Pro gate.
 # Do not put API keys in this file.

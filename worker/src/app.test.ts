@@ -7,7 +7,15 @@ import { addMs } from "./clock";
 import { hashPassword } from "./passwords";
 import { OTP_TTL_MS } from "./otp";
 import { EXAMPLE_INPUT } from "../../lib/tools/email-signature-generator/constants";
-import { RESEND_COOLDOWN_MS } from "./services/auth-service";
+import {
+  FORGOT_PASSWORD_IP_LIMIT,
+  FORGOT_PASSWORD_LIMIT,
+  FORGOT_PASSWORD_MESSAGE,
+  PASSWORD_RESET_TTL_MS,
+  RESEND_COOLDOWN_MS,
+  RESET_PASSWORD_LIMIT,
+} from "./services/auth-service";
+
 
 const ORIGIN = "http://localhost:3000";
 
@@ -43,6 +51,9 @@ function makeApp(now = new Date("2026-09-14T12:00:00.000Z")) {
       cookieSecure: false,
       cookieSameSite: "Lax",
       publicBaseUrl: "https://infyratools.com",
+      proBetaAccess: true,
+      stripePriceId: "",
+      stripeWebhookSecret: "",
     },
   });
 
@@ -342,6 +353,7 @@ describe("email verification", () => {
       email: "legacy@example.com",
       passwordHash: await hashPassword(password),
       emailVerifiedAt: now,
+      stripeCustomerId: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -355,6 +367,177 @@ describe("email verification", () => {
     };
     expect(me.user.emailVerified).toBe(true);
     expect((await request(app, "GET", "/api/signatures", { cookie })).status).toBe(200);
+  });
+});
+
+describe("password reset", () => {
+  function tokenFromResetUrl(url: string | null): string {
+    expect(url).toBeTruthy();
+    const parsed = new URL(url!);
+    expect(parsed.origin).toBe("https://infyratools.com");
+    expect(parsed.pathname).toBe("/reset-password");
+    const token = parsed.searchParams.get("token");
+    expect(token).toBeTruthy();
+    return token!;
+  }
+
+  it("sends a reset email for an existing account and hides unknown emails", async () => {
+    const { app, emails } = makeApp();
+    await registerAndVerify(app, emails, "reset@example.com");
+    emails.messages.length = 0;
+
+    const known = await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "Reset@Example.com" },
+    });
+    expect(known.status).toBe(200);
+    const knownBody = (await known.json()) as { message: string };
+    expect(knownBody.message).toBe(FORGOT_PASSWORD_MESSAGE);
+    expect(emails.messages).toHaveLength(1);
+    expect(emails.messages[0].to).toBe("reset@example.com");
+    expect(emails.messages[0].text).toContain("https://infyratools.com/reset-password?token=");
+    expect(emails.messages[0].text).not.toContain(password);
+
+    const unknown = await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "missing@example.com" },
+    });
+    expect(unknown.status).toBe(200);
+    const unknownBody = (await unknown.json()) as { message: string };
+    expect(unknownBody.message).toBe(FORGOT_PASSWORD_MESSAGE);
+    expect(emails.messages).toHaveLength(1);
+  });
+
+  it("resets the password once, invalidates sessions, and rejects reuse", async () => {
+    const { app, emails } = makeApp();
+    const sessionCookie = await registerAndVerify(app, emails, "owner@example.com");
+    emails.messages.length = 0;
+
+    const forgot = await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "owner@example.com" },
+    });
+    expect(forgot.status).toBe(200);
+    const resetToken = tokenFromResetUrl(emails.lastPasswordResetUrl());
+    const newPassword = "brand-new-secure-pass";
+
+    const reset = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: resetToken, password: newPassword },
+    });
+    expect(reset.status).toBe(200);
+    expect(emails.messages.some((message) => message.subject.includes("password was changed"))).toBe(
+      true,
+    );
+
+    expect((await request(app, "GET", "/api/auth/me", { cookie: sessionCookie })).status).toBe(
+      401,
+    );
+
+    const reused = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: resetToken, password: "another-secure-pass" },
+    });
+    expect(reused.status).toBe(400);
+
+    const oldLogin = await request(app, "POST", "/api/auth/login", {
+      body: { email: "owner@example.com", password },
+    });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app, "POST", "/api/auth/login", {
+      body: { email: "owner@example.com", password: newPassword },
+    });
+    expect(newLogin.status).toBe(200);
+    expect(cookieFrom(newLogin)).toBeTruthy();
+  });
+
+  it("rejects expired and invalid tokens", async () => {
+    const { app, clock, emails } = makeApp();
+    await registerAndVerify(app, emails, "expire@example.com");
+    emails.messages.length = 0;
+
+    await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "expire@example.com" },
+    });
+    const resetToken = tokenFromResetUrl(emails.lastPasswordResetUrl());
+
+    clock.set(addMs(clock.now(), PASSWORD_RESET_TTL_MS + 1));
+    const expired = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: resetToken, password: "fresh-password-99" },
+    });
+    expect(expired.status).toBe(400);
+
+    const invalid = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: "not-a-real-token", password: "fresh-password-99" },
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it("invalidates older reset tokens when a new reset is requested", async () => {
+    const { app, emails } = makeApp();
+    await registerAndVerify(app, emails, "rotate@example.com");
+    emails.messages.length = 0;
+
+    await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "rotate@example.com" },
+    });
+    const oldToken = tokenFromResetUrl(emails.lastPasswordResetUrl());
+
+    await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "rotate@example.com" },
+    });
+    const newToken = tokenFromResetUrl(emails.lastPasswordResetUrl());
+    expect(newToken).not.toBe(oldToken);
+
+    const oldReset = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: oldToken, password: "replacement-password" },
+    });
+    expect(oldReset.status).toBe(400);
+
+    const newReset = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: newToken, password: "replacement-password" },
+    });
+    expect(newReset.status).toBe(200);
+  });
+
+  it("rate limits forgot-password and reset-password attempts", async () => {
+    const { app, emails } = makeApp();
+    await registerAndVerify(app, emails, "limited@example.com");
+
+    for (let i = 0; i < FORGOT_PASSWORD_LIMIT; i += 1) {
+      const response = await request(app, "POST", "/api/auth/forgot-password", {
+        body: { email: "limited@example.com" },
+        ip: "9.9.9.9",
+      });
+      expect(response.status).toBe(200);
+    }
+    const forgotLimited = await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "limited@example.com" },
+      ip: "9.9.9.9",
+    });
+    expect(forgotLimited.status).toBe(429);
+
+    for (let i = 0; i < FORGOT_PASSWORD_IP_LIMIT; i += 1) {
+      const response = await request(app, "POST", "/api/auth/forgot-password", {
+        body: { email: `ip-${i}@example.com` },
+        ip: "8.8.8.8",
+      });
+      expect(response.status).toBe(200);
+    }
+    const ipLimited = await request(app, "POST", "/api/auth/forgot-password", {
+      body: { email: "ip-overflow@example.com" },
+      ip: "8.8.8.8",
+    });
+    expect(ipLimited.status).toBe(429);
+
+    for (let i = 0; i < RESET_PASSWORD_LIMIT; i += 1) {
+      const response = await request(app, "POST", "/api/auth/reset-password", {
+        body: { token: `bad-token-${i}`, password: "fresh-password-99" },
+        ip: "7.7.7.7",
+      });
+      expect(response.status).toBe(400);
+    }
+    const resetLimited = await request(app, "POST", "/api/auth/reset-password", {
+      body: { token: "bad-token-final", password: "fresh-password-99" },
+      ip: "7.7.7.7",
+    });
+    expect(resetLimited.status).toBe(429);
   });
 });
 

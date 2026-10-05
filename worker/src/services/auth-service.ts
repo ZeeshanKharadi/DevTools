@@ -4,6 +4,8 @@ import type { Repositories } from "../db/repositories";
 import { toPublicUser, type PublicUser, type SessionRecord } from "../db/types";
 import {
   EmailDeliveryError,
+  passwordResetConfirmationEmail,
+  passwordResetEmail,
   type EmailSender,
   verificationEmail,
 } from "../email";
@@ -33,8 +35,18 @@ export const RESEND_WINDOW_MS = 15 * 60 * 1000;
 export const RESEND_IP_LIMIT = 8;
 export const RESEND_IP_WINDOW_MS = 60 * 60 * 1000;
 export const RESEND_COOLDOWN_MS = 60 * 1000;
+export const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+export const FORGOT_PASSWORD_LIMIT = 3;
+export const FORGOT_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
+export const FORGOT_PASSWORD_IP_LIMIT = 10;
+export const FORGOT_PASSWORD_IP_WINDOW_MS = 60 * 60 * 1000;
+export const RESET_PASSWORD_LIMIT = 8;
+export const RESET_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
 
 const INVALID_CODE_MESSAGE = "That code is invalid or has expired.";
+const INVALID_RESET_MESSAGE = "That reset link is invalid or has expired.";
+export const FORGOT_PASSWORD_MESSAGE =
+  "If an account exists for this email, you will receive a password reset link.";
 
 export class AuthError extends Error {
   constructor(
@@ -70,12 +82,22 @@ export type AuthService = {
     token: string | null;
     ip: string;
   }): Promise<{ emailSent: boolean; alreadyVerified: boolean }>;
+  requestPasswordReset(input: {
+    email: string;
+    ip: string;
+  }): Promise<{ message: string }>;
+  resetPassword(input: {
+    token: unknown;
+    password: string;
+    ip: string;
+  }): Promise<{ ok: true }>;
 };
 
 export function createAuthService(
   repos: Repositories,
   clock: Clock,
-  email: EmailSender,
+  emailSender: EmailSender,
+  publicBaseUrl: string,
 ): AuthService {
   async function createSession(userId: string): Promise<string> {
     const now = clock.now();
@@ -141,7 +163,7 @@ export function createAuthService(
     });
 
     try {
-      await email.send(verificationEmail(address, otp));
+      await emailSender.send(verificationEmail(address, otp));
       return true;
     } catch (error) {
       if (error instanceof EmailDeliveryError) {
@@ -168,6 +190,17 @@ export function createAuthService(
     if (hits > limit) {
       throw new AuthError(429, "rate_limited", message);
     }
+  }
+
+  function normalizeResetToken(raw: unknown): string | null {
+    if (typeof raw !== "string") {
+      return null;
+    }
+    const token = raw.trim();
+    if (!token || token.length > 200) {
+      return null;
+    }
+    return token;
   }
 
   const unverifiedError = new AuthError(
@@ -203,6 +236,7 @@ export function createAuthService(
           email: normalized,
           passwordHash: await hashPassword(password),
           emailVerifiedAt: null,
+          stripeCustomerId: null,
           createdAt: now,
           updatedAt: now,
         });
@@ -376,6 +410,119 @@ export function createAuthService(
         );
       }
       return { emailSent: true, alreadyVerified: false };
+    },
+
+    async requestPasswordReset({ email, ip }) {
+      await enforceLimit(
+        "forgot_password_ip",
+        ip || "unknown",
+        FORGOT_PASSWORD_IP_LIMIT,
+        FORGOT_PASSWORD_IP_WINDOW_MS,
+        "Too many password reset requests. Try again later.",
+      );
+
+      const normalized = normalizeEmail(email);
+      if (!normalized) {
+        await createSessionToken();
+        return { message: FORGOT_PASSWORD_MESSAGE };
+      }
+
+      await enforceLimit(
+        "forgot_password",
+        normalized,
+        FORGOT_PASSWORD_LIMIT,
+        FORGOT_PASSWORD_WINDOW_MS,
+        "Too many password reset requests. Try again later.",
+      );
+
+      const user = await repos.users.findByEmail(normalized);
+      if (!user) {
+        await createSessionToken();
+        return { message: FORGOT_PASSWORD_MESSAGE };
+      }
+
+      const now = clock.now();
+      const nowIso = toIso(now);
+      const { token, tokenHash } = await createSessionToken();
+      await repos.passwordResets.consumeAllForUser(user.id, nowIso);
+      await repos.passwordResets.create({
+        id: createId(),
+        userId: user.id,
+        tokenHash,
+        expiresAt: toIso(addMs(now, PASSWORD_RESET_TTL_MS)),
+        consumedAt: null,
+        createdAt: nowIso,
+      });
+
+      const resetUrl = `${publicBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+      try {
+        await emailSender.send(passwordResetEmail(user.email, resetUrl));
+      } catch (error) {
+        if (error instanceof EmailDeliveryError) {
+          console.error("email_delivery_failed", error.message);
+        } else {
+          throw error;
+        }
+      }
+
+      return { message: FORGOT_PASSWORD_MESSAGE };
+    },
+
+    async resetPassword({ token, password, ip }) {
+      await enforceLimit(
+        "reset_password",
+        ip || "unknown",
+        RESET_PASSWORD_LIMIT,
+        RESET_PASSWORD_WINDOW_MS,
+        "Too many password reset attempts. Try again later.",
+      );
+
+      const rawToken = normalizeResetToken(token);
+      const invalid = new AuthError(400, "invalid_reset_token", INVALID_RESET_MESSAGE);
+      if (!rawToken) {
+        await hashPassword(typeof password === "string" ? password : "placeholder");
+        throw invalid;
+      }
+
+      const now = clock.now();
+      const nowIso = toIso(now);
+      const tokenHash = await hashToken(rawToken);
+      const challenge = await repos.passwordResets.findActiveByTokenHash(
+        tokenHash,
+        nowIso,
+      );
+
+      if (!challenge) {
+        await hashPassword(typeof password === "string" ? password : "placeholder");
+        throw invalid;
+      }
+
+      const user = await repos.users.findById(challenge.userId);
+      if (!user) {
+        await repos.passwordResets.consume(challenge.id, nowIso);
+        throw invalid;
+      }
+
+      const passwordError = validatePassword(password, user.email);
+      if (passwordError) {
+        throw new AuthError(400, "invalid_password", passwordError);
+      }
+
+      await repos.users.updatePassword(user.id, await hashPassword(password), nowIso);
+      await repos.passwordResets.consumeAllForUser(user.id, nowIso);
+      await repos.sessions.deleteByUserId(user.id);
+
+      try {
+        await emailSender.send(passwordResetConfirmationEmail(user.email));
+      } catch (error) {
+        if (error instanceof EmailDeliveryError) {
+          console.error("email_delivery_failed", error.message);
+        } else {
+          throw error;
+        }
+      }
+
+      return { ok: true as const };
     },
   };
 }

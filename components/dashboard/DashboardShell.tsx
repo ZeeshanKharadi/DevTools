@@ -68,10 +68,6 @@ export function DashboardShell({
           {description}
           {user ? ` Signed in as ${user.email}.` : ""}
         </p>
-        <p className="mt-3 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
-          InfyraTools Pro Beta — Complimentary access to all Pro features during
-          beta. No payment method required.
-        </p>
       </div>
       <nav aria-label="Account">
         <ul className="flex flex-wrap gap-1">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { BillingPanel } from "@/components/dashboard/BillingPanel";
 import { DashboardShell, RequireAuth } from "@/components/dashboard/DashboardShell";
 import { Feedback } from "@/components/ui/Feedback";
 import { fetchDashboardSummary } from "@/lib/pro/api";
@@ -68,6 +69,7 @@ export function SummaryView() {
             {error}
           </Feedback>
         ) : null}
+        <BillingPanel />
         {!summary && !error ? (
           <p className="text-sm text-muted">Loading summary…</p>
         ) : null}

@@ -3,8 +3,40 @@ export type UserRecord = {
   email: string;
   passwordHash: string;
   emailVerifiedAt: string | null;
+  stripeCustomerId: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "unpaid"
+  | "incomplete"
+  | "incomplete_expired"
+  | "paused"
+  | string;
+
+export type SubscriptionRecord = {
+  id: string;
+  userId: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  stripePriceId: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProcessedStripeEventRecord = {
+  eventId: string;
+  eventType: string;
+  processedAt: string;
 };
 
 export type PublicUser = {
@@ -21,6 +53,15 @@ export type EmailVerificationRecord = {
   expiresAt: string;
   consumedAt: string | null;
   failedAttempts: number;
+  createdAt: string;
+};
+
+export type PasswordResetRecord = {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  consumedAt: string | null;
   createdAt: string;
 };
 

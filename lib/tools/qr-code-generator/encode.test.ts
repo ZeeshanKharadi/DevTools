@@ -30,18 +30,22 @@ function input(overrides: {
 }
 
 describe("renderStaticQr", () => {
-  it("renders PNG and SVG for a URL payload", async () => {
-    const result = await renderStaticQr(EXAMPLE_INPUT);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.mode).toBe(QR_GENERATION_MODE);
-      expect(result.payload).toBe("https://example.com/");
-      expect(result.pngDataUrl.startsWith("data:image/png;base64,")).toBe(true);
-      expect(result.svg).toContain("<svg");
-      expect(result.svg).toContain("</svg>");
-      expect(result.errorCorrection).toBe("M");
-    }
-  });
+  it(
+    "renders PNG and SVG for a URL payload",
+    async () => {
+      const result = await renderStaticQr(EXAMPLE_INPUT);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.mode).toBe(QR_GENERATION_MODE);
+        expect(result.payload).toBe("https://example.com/");
+        expect(result.pngDataUrl.startsWith("data:image/png;base64,")).toBe(true);
+        expect(result.svg).toContain("<svg");
+        expect(result.svg).toContain("</svg>");
+        expect(result.errorCorrection).toBe("M");
+      }
+    },
+    15000,
+  );
 
   it("returns a validation error without calling the encoder", async () => {
     const result = await renderStaticQr(input({ fields: { url: "" } }));

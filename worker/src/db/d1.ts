@@ -4,11 +4,14 @@ import type {
   CustomerRepository,
   EmailVerificationRepository,
   InvoiceRepository,
+  PasswordResetRepository,
+  ProcessedStripeEventRepository,
   QrCodeRepository,
   RateLimitStore,
   Repositories,
   SessionRepository,
   SignatureRepository,
+  SubscriptionRepository,
   UserRepository,
 } from "./repositories";
 import type {
@@ -18,8 +21,10 @@ import type {
   DynamicQrRecord,
   EmailVerificationRecord,
   InvoiceRecord,
+  PasswordResetRecord,
   SessionRecord,
   SignatureRecord,
+  SubscriptionRecord,
   UserRecord,
 } from "./types";
 
@@ -38,6 +43,7 @@ type UserRow = {
   email: string;
   password_hash: string;
   email_verified_at: string | null;
+  stripe_customer_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -50,6 +56,29 @@ type VerificationRow = {
   consumed_at: string | null;
   failed_attempts: number;
   created_at: string;
+};
+
+type PasswordResetRow = {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  expires_at: string;
+  consumed_at: string | null;
+  created_at: string;
+};
+
+type SubscriptionRow = {
+  id: string;
+  user_id: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  stripe_price_id: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: number;
+  created_at: string;
+  updated_at: string;
 };
 
 type SessionRow = {
@@ -134,6 +163,7 @@ function mapUser(row: UserRow): UserRecord {
     email: row.email,
     passwordHash: row.password_hash,
     emailVerifiedAt: row.email_verified_at,
+    stripeCustomerId: row.stripe_customer_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -148,6 +178,33 @@ function mapVerification(row: VerificationRow): EmailVerificationRecord {
     consumedAt: row.consumed_at,
     failedAttempts: Number(row.failed_attempts ?? 0),
     createdAt: row.created_at,
+  };
+}
+
+function mapPasswordReset(row: PasswordResetRow): PasswordResetRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    tokenHash: row.token_hash,
+    expiresAt: row.expires_at,
+    consumedAt: row.consumed_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapSubscription(row: SubscriptionRow): SubscriptionRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    stripeCustomerId: row.stripe_customer_id,
+    stripeSubscriptionId: row.stripe_subscription_id,
+    stripePriceId: row.stripe_price_id,
+    status: row.status,
+    currentPeriodStart: row.current_period_start,
+    currentPeriodEnd: row.current_period_end,
+    cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -254,7 +311,7 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     async findByEmail(email) {
       const row = await db
         .prepare(
-          "SELECT id, email, password_hash, email_verified_at, created_at, updated_at FROM users WHERE email = ? LIMIT 1",
+          "SELECT id, email, password_hash, email_verified_at, stripe_customer_id, created_at, updated_at FROM users WHERE email = ? LIMIT 1",
         )
         .bind(email)
         .first<UserRow>();
@@ -263,9 +320,18 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     async findById(id) {
       const row = await db
         .prepare(
-          "SELECT id, email, password_hash, email_verified_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1",
+          "SELECT id, email, password_hash, email_verified_at, stripe_customer_id, created_at, updated_at FROM users WHERE id = ? LIMIT 1",
         )
         .bind(id)
+        .first<UserRow>();
+      return row ? mapUser(row) : null;
+    },
+    async findByStripeCustomerId(stripeCustomerId) {
+      const row = await db
+        .prepare(
+          "SELECT id, email, password_hash, email_verified_at, stripe_customer_id, created_at, updated_at FROM users WHERE stripe_customer_id = ? LIMIT 1",
+        )
+        .bind(stripeCustomerId)
         .first<UserRow>();
       return row ? mapUser(row) : null;
     },
@@ -273,13 +339,14 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
       try {
         await db
           .prepare(
-            "INSERT INTO users (id, email, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO users (id, email, password_hash, email_verified_at, stripe_customer_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
           )
           .bind(
             user.id,
             user.email,
             user.passwordHash,
             user.emailVerifiedAt,
+            user.stripeCustomerId,
             user.createdAt,
             user.updatedAt,
           )
@@ -298,6 +365,20 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
           "UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ? AND email_verified_at IS NULL",
         )
         .bind(verifiedAt, verifiedAt, userId)
+        .run();
+    },
+    async updatePassword(userId, passwordHash, updatedAt) {
+      await db
+        .prepare(
+          "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(passwordHash, updatedAt, userId)
+        .run();
+    },
+    async setStripeCustomerId(userId, stripeCustomerId) {
+      await db
+        .prepare("UPDATE users SET stripe_customer_id = ? WHERE id = ?")
+        .bind(stripeCustomerId, userId)
         .run();
     },
   };
@@ -370,6 +451,49 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     },
   };
 
+  const passwordResets: PasswordResetRepository = {
+    async create(record) {
+      await db
+        .prepare(
+          "INSERT INTO password_reset_challenges (id, user_id, token_hash, expires_at, consumed_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.tokenHash,
+          record.expiresAt,
+          record.consumedAt,
+          record.createdAt,
+        )
+        .run();
+    },
+    async findActiveByTokenHash(tokenHash, nowIso) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, token_hash, expires_at, consumed_at, created_at FROM password_reset_challenges WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? LIMIT 1",
+        )
+        .bind(tokenHash, nowIso)
+        .first<PasswordResetRow>();
+      return row ? mapPasswordReset(row) : null;
+    },
+    async consume(id, consumedAt) {
+      await db
+        .prepare(
+          "UPDATE password_reset_challenges SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
+        )
+        .bind(consumedAt, id)
+        .run();
+    },
+    async consumeAllForUser(userId, consumedAt) {
+      await db
+        .prepare(
+          "UPDATE password_reset_challenges SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
+        )
+        .bind(consumedAt, userId)
+        .run();
+    },
+  };
+
   const sessions: SessionRepository = {
     async create(session) {
       await db
@@ -396,6 +520,12 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     },
     async delete(id) {
       await db.prepare("DELETE FROM sessions WHERE id = ?").bind(id).run();
+    },
+    async deleteByUserId(userId) {
+      await db
+        .prepare("DELETE FROM sessions WHERE user_id = ?")
+        .bind(userId)
+        .run();
     },
     async deleteIfExpired(id, nowIso) {
       await db
@@ -894,10 +1024,116 @@ export function createD1Repositories(db: D1DatabaseLike): Repositories {
     },
   };
 
+  const subscriptions: SubscriptionRepository = {
+    async findByUserId(userId) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, cancel_at_period_end, created_at, updated_at FROM subscriptions WHERE user_id = ? LIMIT 1",
+        )
+        .bind(userId)
+        .first<SubscriptionRow>();
+      return row ? mapSubscription(row) : null;
+    },
+    async findByStripeSubscriptionId(stripeSubscriptionId) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, cancel_at_period_end, created_at, updated_at FROM subscriptions WHERE stripe_subscription_id = ? LIMIT 1",
+        )
+        .bind(stripeSubscriptionId)
+        .first<SubscriptionRow>();
+      return row ? mapSubscription(row) : null;
+    },
+    async findByStripeCustomerId(stripeCustomerId) {
+      const row = await db
+        .prepare(
+          "SELECT id, user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, cancel_at_period_end, created_at, updated_at FROM subscriptions WHERE stripe_customer_id = ? LIMIT 1",
+        )
+        .bind(stripeCustomerId)
+        .first<SubscriptionRow>();
+      return row ? mapSubscription(row) : null;
+    },
+    async upsert(record) {
+      const existing =
+        (await this.findByStripeSubscriptionId(record.stripeSubscriptionId)) ??
+        (await this.findByUserId(record.userId));
+      if (existing) {
+        await db
+          .prepare(
+            "UPDATE subscriptions SET user_id = ?, stripe_customer_id = ?, stripe_subscription_id = ?, stripe_price_id = ?, status = ?, current_period_start = ?, current_period_end = ?, cancel_at_period_end = ?, updated_at = ? WHERE id = ?",
+          )
+          .bind(
+            record.userId,
+            record.stripeCustomerId,
+            record.stripeSubscriptionId,
+            record.stripePriceId,
+            record.status,
+            record.currentPeriodStart,
+            record.currentPeriodEnd,
+            record.cancelAtPeriodEnd ? 1 : 0,
+            record.updatedAt,
+            existing.id,
+          )
+          .run();
+        return;
+      }
+
+      await db
+        .prepare(
+          "INSERT INTO subscriptions (id, user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, cancel_at_period_end, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          record.id,
+          record.userId,
+          record.stripeCustomerId,
+          record.stripeSubscriptionId,
+          record.stripePriceId,
+          record.status,
+          record.currentPeriodStart,
+          record.currentPeriodEnd,
+          record.cancelAtPeriodEnd ? 1 : 0,
+          record.createdAt,
+          record.updatedAt,
+        )
+        .run();
+    },
+  };
+
+  const processedStripeEvents: ProcessedStripeEventRepository = {
+    async has(eventId) {
+      const row = await db
+        .prepare(
+          "SELECT event_id FROM processed_stripe_events WHERE event_id = ? LIMIT 1",
+        )
+        .bind(eventId)
+        .first<{ event_id: string }>();
+      return Boolean(row);
+    },
+    async record(record) {
+      try {
+        await db
+          .prepare(
+            "INSERT INTO processed_stripe_events (event_id, event_type, processed_at) VALUES (?, ?, ?)",
+          )
+          .bind(record.eventId, record.eventType, record.processedAt)
+          .run();
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("UNIQUE") || message.includes("unique")) {
+          return false;
+        }
+        throw error;
+      }
+    },
+  };
+
   return {
     users,
     sessions,
     verifications,
+    passwordResets,
+    subscriptions,
+    processedStripeEvents,
     signatures,
     cards,
     qrCodes,

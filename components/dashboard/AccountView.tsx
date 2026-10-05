@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BillingPanel } from "@/components/dashboard/BillingPanel";
 import { DashboardShell, RequireAuth } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
@@ -81,6 +82,7 @@ export function AccountView() {
           <p className="text-sm font-medium">Sign-in email</p>
           <p className="mt-1 text-sm text-muted">{user?.email}</p>
         </div>
+        <BillingPanel />
         {loading ? <p className="text-sm text-muted">Loading profile…</p> : null}
         <form
           className="space-y-3 rounded-xl border border-line bg-panel p-4"

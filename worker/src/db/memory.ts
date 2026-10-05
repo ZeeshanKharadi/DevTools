@@ -4,11 +4,14 @@ import type {
   CustomerRepository,
   EmailVerificationRepository,
   InvoiceRepository,
+  PasswordResetRepository,
+  ProcessedStripeEventRepository,
   QrCodeRepository,
   RateLimitStore,
   Repositories,
   SessionRepository,
   SignatureRepository,
+  SubscriptionRepository,
   UserRepository,
 } from "./repositories";
 import type {
@@ -18,8 +21,11 @@ import type {
   DynamicQrRecord,
   EmailVerificationRecord,
   InvoiceRecord,
+  PasswordResetRecord,
+  ProcessedStripeEventRecord,
   SessionRecord,
   SignatureRecord,
+  SubscriptionRecord,
   UserRecord,
 } from "./types";
 
@@ -40,6 +46,9 @@ export function createMemoryRepositories(): Repositories {
   const users: UserRecord[] = [];
   const sessions: SessionRecord[] = [];
   const verifications: EmailVerificationRecord[] = [];
+  const passwordResets: PasswordResetRecord[] = [];
+  const subscriptions: SubscriptionRecord[] = [];
+  const processedStripeEvents: ProcessedStripeEventRecord[] = [];
   const signatures: SignatureRecord[] = [];
   const cards: BusinessCardRecord[] = [];
   const qrCodes: DynamicQrRecord[] = [];
@@ -56,6 +65,11 @@ export function createMemoryRepositories(): Repositories {
     async findById(id) {
       return users.find((user) => user.id === id) ?? null;
     },
+    async findByStripeCustomerId(stripeCustomerId) {
+      return (
+        users.find((user) => user.stripeCustomerId === stripeCustomerId) ?? null
+      );
+    },
     async create(user) {
       if (users.some((existing) => existing.email === user.email)) {
         throw new Error("UNIQUE_EMAIL");
@@ -67,6 +81,19 @@ export function createMemoryRepositories(): Repositories {
       if (user && !user.emailVerifiedAt) {
         user.emailVerifiedAt = verifiedAt;
         user.updatedAt = verifiedAt;
+      }
+    },
+    async updatePassword(userId, passwordHash, updatedAt) {
+      const user = users.find((item) => item.id === userId);
+      if (user) {
+        user.passwordHash = passwordHash;
+        user.updatedAt = updatedAt;
+      }
+    },
+    async setStripeCustomerId(userId, stripeCustomerId) {
+      const user = users.find((item) => item.id === userId);
+      if (user) {
+        user.stripeCustomerId = stripeCustomerId;
       }
     },
   };
@@ -117,6 +144,83 @@ export function createMemoryRepositories(): Repositories {
     },
   };
 
+  const passwordResetRepo: PasswordResetRepository = {
+    async create(record) {
+      passwordResets.push(record);
+    },
+    async findActiveByTokenHash(tokenHash, nowIso) {
+      return (
+        passwordResets.find(
+          (item) =>
+            item.tokenHash === tokenHash &&
+            item.consumedAt === null &&
+            item.expiresAt > nowIso,
+        ) ?? null
+      );
+    },
+    async consume(id, consumedAt) {
+      const record = passwordResets.find((item) => item.id === id);
+      if (record && record.consumedAt === null) {
+        record.consumedAt = consumedAt;
+      }
+    },
+    async consumeAllForUser(userId, consumedAt) {
+      for (const record of passwordResets) {
+        if (record.userId === userId && record.consumedAt === null) {
+          record.consumedAt = consumedAt;
+        }
+      }
+    },
+  };
+
+  const subscriptionRepo: SubscriptionRepository = {
+    async findByUserId(userId) {
+      return subscriptions.find((item) => item.userId === userId) ?? null;
+    },
+    async findByStripeSubscriptionId(stripeSubscriptionId) {
+      return (
+        subscriptions.find(
+          (item) => item.stripeSubscriptionId === stripeSubscriptionId,
+        ) ?? null
+      );
+    },
+    async findByStripeCustomerId(stripeCustomerId) {
+      return (
+        subscriptions.find((item) => item.stripeCustomerId === stripeCustomerId) ??
+        null
+      );
+    },
+    async upsert(record) {
+      const index = subscriptions.findIndex(
+        (item) =>
+          item.stripeSubscriptionId === record.stripeSubscriptionId ||
+          item.userId === record.userId,
+      );
+      if (index >= 0) {
+        subscriptions[index] = {
+          ...record,
+          id: subscriptions[index].id,
+          createdAt: subscriptions[index].createdAt,
+        };
+      } else {
+        subscriptions.push(record);
+      }
+    },
+  };
+
+  const processedStripeEventRepo: ProcessedStripeEventRepository = {
+    async has(eventId) {
+      return processedStripeEvents.some((item) => item.eventId === eventId);
+    },
+    async record(record) {
+      if (processedStripeEvents.some((item) => item.eventId === record.eventId)) {
+        return false;
+      }
+      processedStripeEvents.push(record);
+      return true;
+    },
+  };
+
   const sessionRepo: SessionRepository = {
     async create(session) {
       sessions.push(session);
@@ -132,6 +236,13 @@ export function createMemoryRepositories(): Repositories {
       const index = sessions.findIndex((session) => session.id === id);
       if (index >= 0) {
         sessions.splice(index, 1);
+      }
+    },
+    async deleteByUserId(userId) {
+      for (let i = sessions.length - 1; i >= 0; i -= 1) {
+        if (sessions[i].userId === userId) {
+          sessions.splice(i, 1);
+        }
       }
     },
     async deleteIfExpired(id, nowIso) {
@@ -384,6 +495,9 @@ export function createMemoryRepositories(): Repositories {
     users: userRepo,
     sessions: sessionRepo,
     verifications: verificationRepo,
+    passwordResets: passwordResetRepo,
+    subscriptions: subscriptionRepo,
+    processedStripeEvents: processedStripeEventRepo,
     signatures: signatureRepo,
     cards: cardRepo,
     qrCodes: qrRepo,

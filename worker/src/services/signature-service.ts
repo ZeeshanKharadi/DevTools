@@ -8,7 +8,7 @@ import { toIso } from "../clock";
 import type { Repositories } from "../db/repositories";
 import type { SignatureRecord } from "../db/types";
 import { createId } from "../ids";
-import { requireFeature, type EntitlementService, createEntitlementService } from "./entitlement";
+import { requireFeature, type EntitlementService, createBetaEntitlementService } from "./entitlement";
 
 export class SignatureError extends Error {
   constructor(
@@ -78,7 +78,7 @@ async function ownedSignature(
 export function createSignatureService(
   repos: Repositories,
   clock: Clock,
-  entitlements: EntitlementService = createEntitlementService(),
+  entitlements: EntitlementService = createBetaEntitlementService(),
 ) {
   return {
     async list(userId: string): Promise<SignatureListItem[]> {

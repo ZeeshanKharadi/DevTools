@@ -1,6 +1,10 @@
 import { createApp, type AppConfig } from "./app";
 import { createD1Repositories } from "./db/d1";
 import { createEmailSenderFromEnv } from "./email";
+import {
+  createStripeClient,
+  createUnconfiguredStripeClient,
+} from "./stripe/client";
 
 export type WorkerEnv = {
   DB: {
@@ -19,6 +23,10 @@ export type WorkerEnv = {
   EMAIL_PROVIDER?: string;
   EMAIL_FROM?: string;
   RESEND_API_KEY?: string;
+  PRO_BETA_ACCESS?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_ID?: string;
 };
 
 function configFromEnv(env: WorkerEnv): AppConfig {
@@ -32,16 +40,27 @@ function configFromEnv(env: WorkerEnv): AppConfig {
     allowedOrigins: origins,
     cookieSecure: env.COOKIE_SECURE === "true" || sameSite === "None",
     cookieSameSite: sameSite,
-    publicBaseUrl: (env.PUBLIC_BASE_URL ?? "http://localhost:8787").replace(/\/$/, ""),
+    publicBaseUrl: (env.PUBLIC_BASE_URL ?? "http://localhost:8787").replace(
+      /\/$/,
+      "",
+    ),
+    // Default true preserves complimentary Pro until Stripe is enabled and beta is turned off.
+    proBetaAccess: env.PRO_BETA_ACCESS !== "false",
+    stripePriceId: env.STRIPE_PRICE_ID?.trim() ?? "",
+    stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET?.trim() ?? "",
   };
 }
 
 const worker = {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+    const secretKey = env.STRIPE_SECRET_KEY?.trim();
     const app = createApp({
       repos: createD1Repositories(env.DB),
       config: configFromEnv(env),
       email: createEmailSenderFromEnv(env),
+      stripe: secretKey
+        ? createStripeClient(secretKey)
+        : createUnconfiguredStripeClient(),
     });
     return app.fetch(request);
   },
