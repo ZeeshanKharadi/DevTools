@@ -4,11 +4,16 @@ import { cronGeneratorContent } from "./cron-generator";
 import { digitalBusinessCardContent } from "./digital-business-card";
 import { emailSignatureGeneratorContent } from "./email-signature-generator";
 import { invoiceGeneratorContent } from "./invoice-generator";
+import { jpgToPdfContent } from "./jpg-to-pdf";
+import { mergePdfContent } from "./merge-pdf";
+import { pdfToJpgContent } from "./pdf-to-jpg";
 import { qrCodeGeneratorContent } from "./qr-code-generator";
 import { jsonFormatterContent } from "./json-formatter";
 import { jsonValidatorContent } from "./json-validator";
 import { jwtDecoderContent } from "./jwt-decoder";
 import { regexTesterContent } from "./regex-tester";
+import { rotatePdfContent } from "./rotate-pdf";
+import { splitPdfContent } from "./split-pdf";
 import { sqlFormatterContent } from "./sql-formatter";
 import { unixTimestampContent } from "./unix-timestamp";
 import { urlEncoderContent } from "./url-encoder";
@@ -30,6 +35,11 @@ const contentBySlug: Record<ToolSlug, ToolContent> = {
   "qr-code-generator": qrCodeGeneratorContent,
   "invoice-generator": invoiceGeneratorContent,
   "digital-business-card": digitalBusinessCardContent,
+  "merge-pdf": mergePdfContent,
+  "split-pdf": splitPdfContent,
+  "jpg-to-pdf": jpgToPdfContent,
+  "pdf-to-jpg": pdfToJpgContent,
+  "rotate-pdf": rotatePdfContent,
 };
 
 export function getToolContent(slug: ToolSlug): ToolContent {

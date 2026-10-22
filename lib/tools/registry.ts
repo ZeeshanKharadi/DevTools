@@ -31,6 +31,11 @@ export const CATEGORIES: readonly Category[] = [
     label: "Business",
     description: "Create professional assets for email and outreach.",
   },
+  {
+    id: "pdf",
+    label: "PDF",
+    description: "Merge, split, convert, and rotate PDF files in your browser.",
+  },
 ] as const;
 
 export const TOOLS: readonly Tool[] = [
@@ -329,6 +334,101 @@ export const TOOLS: readonly Tool[] = [
     popular: true,
     related: ["email-signature-generator", "qr-code-generator"],
     capabilities: ["copy", "clear", "download"],
+  },
+  {
+    slug: "merge-pdf",
+    name: "Merge PDF",
+    title: "Merge PDF Online Free — Combine PDF Files | InfyraTools",
+    h1: "Merge PDF",
+    description:
+      "Combine multiple PDF files into one document in your browser. Reorder files, then download. Nothing is uploaded.",
+    category: "pdf",
+    keywords: [
+      "merge pdf",
+      "combine pdf",
+      "merge pdf online free",
+      "join pdf",
+      "pdf merger",
+    ],
+    popular: true,
+    related: ["split-pdf", "rotate-pdf", "jpg-to-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "split-pdf",
+    name: "Split PDF",
+    title: "Split PDF Online Free — Extract PDF Pages | InfyraTools",
+    h1: "Split PDF",
+    description:
+      "Extract selected PDF pages or download pages as separate files. Choose pages or ranges in your browser. Nothing is uploaded.",
+    category: "pdf",
+    keywords: [
+      "split pdf",
+      "extract pdf pages",
+      "split pdf online free",
+      "pdf page extractor",
+      "pdf splitter",
+    ],
+    popular: true,
+    related: ["merge-pdf", "pdf-to-jpg", "rotate-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "jpg-to-pdf",
+    name: "JPG to PDF",
+    title: "JPG to PDF Converter Online Free | InfyraTools",
+    h1: "JPG to PDF",
+    description:
+      "Convert JPG and PNG images into a PDF in your browser. Reorder images, choose page size, and download. Nothing is uploaded.",
+    category: "pdf",
+    keywords: [
+      "jpg to pdf",
+      "jpeg to pdf",
+      "png to pdf",
+      "image to pdf",
+      "jpg to pdf converter online free",
+    ],
+    popular: true,
+    related: ["pdf-to-jpg", "merge-pdf", "rotate-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "pdf-to-jpg",
+    name: "PDF to JPG",
+    title: "PDF to JPG Converter Online Free | InfyraTools",
+    h1: "PDF to JPG",
+    description:
+      "Convert PDF pages into JPG images in your browser. Download one image or a ZIP of selected pages. Nothing is uploaded.",
+    category: "pdf",
+    keywords: [
+      "pdf to jpg",
+      "pdf to jpeg",
+      "pdf to image",
+      "pdf to jpg converter online free",
+      "convert pdf pages",
+    ],
+    popular: true,
+    related: ["jpg-to-pdf", "split-pdf", "rotate-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "rotate-pdf",
+    name: "Rotate PDF",
+    title: "Rotate PDF Online Free — Rotate PDF Pages | InfyraTools",
+    h1: "Rotate PDF",
+    description:
+      "Rotate individual PDF pages or the whole document in your browser. Preview changes, then download. Nothing is uploaded.",
+    category: "pdf",
+    keywords: [
+      "rotate pdf",
+      "rotate pdf pages",
+      "rotate pdf online free",
+      "pdf rotator",
+      "fix pdf pages",
+    ],
+    popular: true,
+    related: ["merge-pdf", "split-pdf", "pdf-to-jpg"],
+    capabilities: ["download", "clear"],
   },
 ] as const;
 

@@ -12,6 +12,8 @@ const eslintConfig = [
       "next-env.d.ts",
       ".wrangler/**",
       "worker/.wrangler/**",
+      // Vendored PDF.js worker (minified third-party bundle)
+      "public/pdf.worker.min.mjs",
     ],
   },
 ];

@@ -19,8 +19,11 @@ Required registry fields: `slug`, `name`, `title`, `h1`, `description`, `categor
 | `generators` | Generators | UUID Generator, Cron Expression Generator |
 | `time` | Time | Unix Timestamp Converter |
 | `text` | Text & Query | Regex Tester, SQL Formatter |
+| `business` | Business | Email Signature, QR, Invoice, Digital Business Card |
+| `pdf` | PDF | Merge PDF, Split PDF, JPG to PDF, PDF to JPG, Rotate PDF |
 
-Popular tools on the homepage are any registry entry with `popular: true`. Do not hardcode that list in page components.
+See also `docs/PDF_TOOLS.md` for PDF processing architecture.
+
 
 Current popular tools: JSON Formatter, JWT Decoder, Base64, UUID Generator, Regex Tester.
 

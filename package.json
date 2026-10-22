@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "pdf:sync-worker": "node -e \"const fs=require('fs');const p=require('pdfjs-dist/package.json');fs.copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs');console.log('Synced pdf.worker.min.mjs from pdfjs-dist@'+p.version);\"",
     "worker:dev": "wrangler dev --config worker/wrangler.toml",
     "d1:create": "wrangler d1 create infyratools-production --config worker/wrangler.toml",
     "d1:migrate:local": "wrangler d1 migrations apply infyratools-production --local --config worker/wrangler.toml",
@@ -17,7 +18,10 @@
   },
   "dependencies": {
     "jspdf": "^4.2.1",
+    "jszip": "^3.10.2",
     "next": "^16.3.3",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

@@ -42,6 +42,13 @@ const InvoiceTool = dynamic(
 const DigitalBusinessCardTool = dynamic(
   () => import("@/components/digital-business-card/DigitalBusinessCardTool"),
 );
+const MergePdfTool = dynamic(() => import("@/components/merge-pdf/MergePdfTool"));
+const SplitPdfTool = dynamic(() => import("@/components/split-pdf/SplitPdfTool"));
+const JpgToPdfTool = dynamic(() => import("@/components/jpg-to-pdf/JpgToPdfTool"));
+const PdfToJpgTool = dynamic(() => import("@/components/pdf-to-jpg/PdfToJpgTool"));
+const RotatePdfTool = dynamic(
+  () => import("@/components/rotate-pdf/RotatePdfTool"),
+);
 
 type ToolIslandProps = {
   tool: Tool;
@@ -77,6 +84,16 @@ export function ToolIsland({ tool }: ToolIslandProps) {
       return <InvoiceTool />;
     case "digital-business-card":
       return <DigitalBusinessCardTool />;
+    case "merge-pdf":
+      return <MergePdfTool />;
+    case "split-pdf":
+      return <SplitPdfTool />;
+    case "jpg-to-pdf":
+      return <JpgToPdfTool />;
+    case "pdf-to-jpg":
+      return <PdfToJpgTool />;
+    case "rotate-pdf":
+      return <RotatePdfTool />;
     default: {
       const exhaustive: never = tool.slug;
       throw new Error(`No workspace for ${exhaustive}`);

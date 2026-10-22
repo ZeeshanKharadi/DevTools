@@ -4,7 +4,8 @@ export type CategoryId =
   | "generators"
   | "time"
   | "text"
-  | "business";
+  | "business"
+  | "pdf";
 
 export type ToolCapability = "copy" | "clear" | "paste" | "download" | "swap";
 
@@ -22,7 +23,12 @@ export type ToolSlug =
   | "email-signature-generator"
   | "qr-code-generator"
   | "invoice-generator"
-  | "digital-business-card";
+  | "digital-business-card"
+  | "merge-pdf"
+  | "split-pdf"
+  | "jpg-to-pdf"
+  | "pdf-to-jpg"
+  | "rotate-pdf";
 
 export type Tool = {
   slug: ToolSlug;
