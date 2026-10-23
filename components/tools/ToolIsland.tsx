@@ -49,6 +49,19 @@ const PdfToJpgTool = dynamic(() => import("@/components/pdf-to-jpg/PdfToJpgTool"
 const RotatePdfTool = dynamic(
   () => import("@/components/rotate-pdf/RotatePdfTool"),
 );
+const OrganizePdfTool = dynamic(
+  () => import("@/components/organize-pdf/OrganizePdfTool"),
+);
+const WatermarkPdfTool = dynamic(
+  () => import("@/components/watermark-pdf/WatermarkPdfTool"),
+);
+const SignPdfTool = dynamic(() => import("@/components/sign-pdf/SignPdfTool"));
+const ImageCompressorTool = dynamic(
+  () => import("@/components/image-compressor/ImageCompressorTool"),
+);
+const ImageResizerTool = dynamic(
+  () => import("@/components/image-resizer/ImageResizerTool"),
+);
 
 type ToolIslandProps = {
   tool: Tool;
@@ -94,6 +107,16 @@ export function ToolIsland({ tool }: ToolIslandProps) {
       return <PdfToJpgTool />;
     case "rotate-pdf":
       return <RotatePdfTool />;
+    case "organize-pdf":
+      return <OrganizePdfTool />;
+    case "watermark-pdf":
+      return <WatermarkPdfTool />;
+    case "sign-pdf":
+      return <SignPdfTool />;
+    case "image-compressor":
+      return <ImageCompressorTool />;
+    case "image-resizer":
+      return <ImageResizerTool />;
     default: {
       const exhaustive: never = tool.slug;
       throw new Error(`No workspace for ${exhaustive}`);

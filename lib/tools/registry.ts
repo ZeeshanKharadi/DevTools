@@ -34,7 +34,13 @@ export const CATEGORIES: readonly Category[] = [
   {
     id: "pdf",
     label: "PDF",
-    description: "Merge, split, convert, and rotate PDF files in your browser.",
+    description:
+      "Merge, split, convert, organize, watermark, and sign PDF files in your browser.",
+  },
+  {
+    id: "images",
+    label: "Images",
+    description: "Compress and resize images locally in your browser.",
   },
 ] as const;
 
@@ -427,7 +433,102 @@ export const TOOLS: readonly Tool[] = [
       "fix pdf pages",
     ],
     popular: true,
-    related: ["merge-pdf", "split-pdf", "pdf-to-jpg"],
+    related: ["merge-pdf", "split-pdf", "organize-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "organize-pdf",
+    name: "PDF Page Organizer",
+    title: "Organize PDF Pages Online Free | InfyraTools",
+    h1: "PDF Page Organizer",
+    description:
+      "Reorder, delete, duplicate, and rotate PDF pages online for free. Organize your PDF locally in your browser without uploading files.",
+    category: "pdf",
+    keywords: [
+      "organize pdf",
+      "reorder pdf pages",
+      "delete pdf pages",
+      "duplicate pdf pages",
+      "pdf page organizer",
+    ],
+    popular: true,
+    related: ["rotate-pdf", "split-pdf", "merge-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "watermark-pdf",
+    name: "Add Watermark to PDF",
+    title: "Add Watermark to PDF Online Free | InfyraTools",
+    h1: "Add Watermark to PDF",
+    description:
+      "Add text or image watermarks to PDF files for free. Customize opacity, size, rotation, and position directly in your browser.",
+    category: "pdf",
+    keywords: [
+      "watermark pdf",
+      "add watermark to pdf",
+      "pdf stamp",
+      "confidential pdf",
+      "watermark pdf online free",
+    ],
+    popular: true,
+    related: ["sign-pdf", "organize-pdf", "merge-pdf"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "sign-pdf",
+    name: "Sign PDF",
+    title: "Sign PDF Online Free — Add Signature to PDF | InfyraTools",
+    h1: "Sign PDF",
+    description:
+      "Draw, type, or upload a signature and place it on a PDF online for free. Sign documents locally without uploading your files.",
+    category: "pdf",
+    keywords: [
+      "sign pdf",
+      "pdf signature",
+      "add signature to pdf",
+      "electronic signature",
+      "sign pdf online free",
+    ],
+    popular: true,
+    related: ["watermark-pdf", "organize-pdf", "pdf-to-jpg"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "image-compressor",
+    name: "Image Compressor",
+    title: "Compress Images Online Free — JPG, PNG, WebP | InfyraTools",
+    h1: "Image Compressor",
+    description:
+      "Compress JPG, PNG, and WebP images online for free. Reduce image sizes locally in your browser without uploading files.",
+    category: "images",
+    keywords: [
+      "compress image",
+      "image compressor",
+      "compress jpg",
+      "compress png",
+      "compress webp",
+    ],
+    popular: true,
+    related: ["image-resizer", "jpg-to-pdf", "pdf-to-jpg"],
+    capabilities: ["download", "clear"],
+  },
+  {
+    slug: "image-resizer",
+    name: "Image Resizer",
+    title: "Resize Images Online Free — JPG, PNG, WebP | InfyraTools",
+    h1: "Image Resizer",
+    description:
+      "Resize JPG, PNG, and WebP images online for free. Adjust dimensions, aspect ratio, and output format directly in your browser.",
+    category: "images",
+    keywords: [
+      "resize image",
+      "image resizer",
+      "resize jpg",
+      "change image size",
+      "image dimensions",
+    ],
+    popular: true,
+    related: ["image-compressor", "jpg-to-pdf", "pdf-to-jpg"],
     capabilities: ["download", "clear"],
   },
 ] as const;

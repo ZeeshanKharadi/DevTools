@@ -52,7 +52,7 @@ export function ToolPage({ tool, content }: ToolPageProps) {
           </div>
         </header>
 
-        <div id="workspace" className="mt-5 scroll-mt-20">
+        <div id="workspace" className="mt-5 min-w-0 scroll-mt-20">
           <RevealWorkspace />
           <ToolIsland tool={tool} />
         </div>

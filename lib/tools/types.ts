@@ -5,7 +5,8 @@ export type CategoryId =
   | "time"
   | "text"
   | "business"
-  | "pdf";
+  | "pdf"
+  | "images";
 
 export type ToolCapability = "copy" | "clear" | "paste" | "download" | "swap";
 
@@ -28,7 +29,12 @@ export type ToolSlug =
   | "split-pdf"
   | "jpg-to-pdf"
   | "pdf-to-jpg"
-  | "rotate-pdf";
+  | "rotate-pdf"
+  | "organize-pdf"
+  | "watermark-pdf"
+  | "sign-pdf"
+  | "image-compressor"
+  | "image-resizer";
 
 export type Tool = {
   slug: ToolSlug;

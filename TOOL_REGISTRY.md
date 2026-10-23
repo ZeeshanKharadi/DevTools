@@ -20,7 +20,8 @@ Required registry fields: `slug`, `name`, `title`, `h1`, `description`, `categor
 | `time` | Time | Unix Timestamp Converter |
 | `text` | Text & Query | Regex Tester, SQL Formatter |
 | `business` | Business | Email Signature, QR, Invoice, Digital Business Card |
-| `pdf` | PDF | Merge PDF, Split PDF, JPG to PDF, PDF to JPG, Rotate PDF |
+| `pdf` | PDF | Merge PDF, Split PDF, JPG to PDF, PDF to JPG, Rotate PDF, PDF Page Organizer, Add Watermark to PDF, Sign PDF |
+| `images` | Images | Image Compressor, Image Resizer |
 
 See also `docs/PDF_TOOLS.md` for PDF processing architecture.
 

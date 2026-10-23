@@ -12,16 +12,16 @@ const nav = [
 export function Header() {
   return (
     <header className="border-b border-line bg-panel/90 backdrop-blur-sm">
-      <Container className="flex h-16 items-center justify-between gap-4">
-        <div className="flex items-center gap-8">
+      <Container className="flex h-16 min-w-0 items-center justify-between gap-3 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-4 sm:gap-8">
           <Link
             href="/"
-            className="text-sm font-semibold tracking-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+            className="shrink-0 text-sm font-semibold tracking-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
           >
             {SITE_NAME}
           </Link>
-          <nav aria-label="Primary">
-            <ul className="flex items-center gap-4 text-sm">
+          <nav aria-label="Primary" className="min-w-0">
+            <ul className="flex items-center gap-3 text-sm sm:gap-4">
               {nav.map((item) => (
                 <li key={item.href}>
                   <Link
@@ -35,7 +35,7 @@ export function Header() {
             </ul>
           </nav>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <AuthNav />
           <ThemeToggle />
         </div>
